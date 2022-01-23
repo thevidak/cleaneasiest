@@ -11,4 +11,8 @@ class Shop extends Model
 
     protected $fillable = ['name', 'description'];
 
+    public function services() {
+        return Service::where('shop_id', "=", $this->id)->get();
+    }
+
 }

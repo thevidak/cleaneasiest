@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Price;
 use Illuminate\Http\Request;
 use App\Models\Service;
 use App\Models\Shop;
@@ -44,6 +45,11 @@ class ServiceController extends Controller
     public function search(Request $request) {
         return Service::where('name', 'like', '%' . $request->name . '%')->get();
     }
+
+    public function shop($id) {
+        return Service::where('shop_id', '=', $id)->get();
+    }
+
 
     /*  WORKER SPECIFIC FUNCTIONS  */
     public function workerServices(Request $request) {

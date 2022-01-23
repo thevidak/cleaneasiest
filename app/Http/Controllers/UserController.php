@@ -213,5 +213,20 @@ class UserController extends Controller
         ];
     }
 
+    public function updateLocation(Request $request) {
+        $request->validate([
+            'latitude' => 'required',
+            'longitude' => 'required'
+        ]);
+        $user = Auth::user();
+        $user->location = ['latitude' => $request['latitude'], 'longitude' => $request['longitude']];
+        $user->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Location Updated!'
+        ], 200);
+    }
+
 
 }

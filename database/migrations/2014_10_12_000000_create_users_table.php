@@ -28,6 +28,7 @@ class CreateUsersTable extends Migration
             $table->string('phone');
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
+            $table->json('location')->nullable();
             $table->string('password');
             $table->rememberToken();
             $table->foreignIdFor(Role::class)->default(5);

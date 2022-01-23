@@ -19,9 +19,6 @@ class CreateServicesTable extends Migration
             $table->id();
             $table->string('name');
             $table->string('description')->nullable();
-            $table->foreignIdFor(ServiceType::class);
-            $table->foreignIdFor(Shop::class);
-            $table->timestamps();
         });
     }
 

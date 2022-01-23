@@ -38,6 +38,9 @@ class ShopController extends Controller
     }
 
 
+    public function get($id) {
+        return Shop::find($id);
+    }
     /*  WORKER SPECIFIC FUNCTIONS  */
     public function workerShop(Request $request) {
         return Shop::where('user_id',Auth::id())->first();
