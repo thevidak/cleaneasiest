@@ -11,7 +11,11 @@ use Illuminate\Support\Facades\Auth;
 class ServiceController extends Controller
 {
     public function index() {
-        return Service::all();
+        $services = Service::all();
+        return response()->json([
+            "status" => 1,
+            "result" => $services
+        ]);
     }
 
     public function create() {

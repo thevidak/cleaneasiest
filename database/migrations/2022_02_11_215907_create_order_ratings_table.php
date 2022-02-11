@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateRejectedOrdersTable extends Migration
+class CreateOrderRatingsTable extends Migration
 {
     /**
      * Run the migrations.
@@ -13,10 +13,10 @@ class CreateRejectedOrdersTable extends Migration
      */
     public function up()
     {
-        Schema::create('rejected_orders', function (Blueprint $table) {
+        Schema::create('order_ratings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('order_id');
-            $table->foreignId('user_id');
+            $table->json('service_ratings');
             $table->string('note')->nullable();
             $table->timestamps();
         });
@@ -29,6 +29,6 @@ class CreateRejectedOrdersTable extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('rejected_orders');
+        Schema::dropIfExists('order_ratings');
     }
 }

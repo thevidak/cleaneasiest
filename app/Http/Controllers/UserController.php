@@ -12,6 +12,8 @@ use App\Models\User;
 use App\Models\WorkerProfile;
 use Illuminate\Support\Facades\Auth;
 
+use Illuminate\Auth\Events\Registered;
+
 class UserController extends Controller
 {
     // register CLIENT user
@@ -26,7 +28,7 @@ class UserController extends Controller
             'zip' => 'required|string',
             'phone' => 'required|string',
             'email' => 'required|string|unique:users,email',
-            'password' => 'required|string|confirmed'
+            'password' => 'required|string'
         ]);
 
         $user = User::create([
@@ -40,17 +42,19 @@ class UserController extends Controller
             'municipality' => $fields['municipality'],
             'zip' => $fields['zip'],
             'phone' => $fields['phone'],
-            'role_id' => Role::CLIENT
+            'role_id' => Role::CLIENT,
+            'location' => googleAPIGetGeoLocationFromAddress($fields['address'] . ", " . $fields['city'])
         ]);
 
         $token = $user->createToken('myapptoken')->plainTextToken;
 
-        $response = [
-            'user' => $user,
-            'token' => $token
-        ];
+        //event(new Registered($user));
 
-        return response($response, 201);
+        return response()->json([
+            'status' => 1,
+            //'user' => $user,
+            'token' => $token
+        ]);
     }
 
     public function createDriver(Request $request) {
@@ -64,7 +68,7 @@ class UserController extends Controller
             'zip' => 'required|string',
             'phone' => 'required|string',
             'email' => 'required|string|unique:users,email',
-            'password' => 'required|string|confirmed'
+            'password' => 'required|string'
         ]);
 
         $user = User::create([
@@ -78,7 +82,8 @@ class UserController extends Controller
             'municipality' => $fields['municipality'],
             'zip' => $fields['zip'],
             'phone' => $fields['phone'],
-            'role_id' => Role::DRIVER
+            'role_id' => Role::DRIVER,
+            'location' => googleAPIGetGeoLocationFromAddress($fields['address'] . ", " . $fields['city'])
         ]);
 
         $response = [
@@ -99,7 +104,7 @@ class UserController extends Controller
             'zip' => 'required|string',
             'phone' => 'required|string',
             'email' => 'required|string|unique:users,email',
-            'password' => 'required|string|confirmed',
+            'password' => 'required|string',
             'shop_id' => 'integer',
             'shop_name' => 'string',
             'shop_description' => 'string'
@@ -116,7 +121,8 @@ class UserController extends Controller
             'municipality' => $fields['municipality'],
             'zip' => $fields['zip'],
             'phone' => $fields['phone'],
-            'role_id' => Role::WORKER
+            'role_id' => Role::WORKER,
+            'location' => googleAPIGetGeoLocationFromAddress($fields['address'] . ", " . $fields['city'])
         ]);
 
         if (isset($fields['shop_id'])) {
@@ -156,7 +162,7 @@ class UserController extends Controller
             'zip' => 'required|string',
             'phone' => 'required|string',
             'email' => 'required|string|unique:users,email',
-            'password' => 'required|string|confirmed'
+            'password' => 'required|string'
         ]);
 
         $user = User::create([
@@ -170,13 +176,15 @@ class UserController extends Controller
             'municipality' => $fields['municipality'],
             'zip' => $fields['zip'],
             'phone' => $fields['phone'],
-            'role_id' => Role::CLIENT
+            'role_id' => Role::CLIENT,
+            'location' => googleAPIGetGeoLocationFromAddress($fields['address'] . ", " . $fields['city'])
         ]);
 
         $response = [
             'user' => $user,
         ];
 
+        event(new Registered($user));
         return response($response, 201);
     }
 
@@ -188,22 +196,34 @@ class UserController extends Controller
             'password' => 'required|string'
         ]);
 
-        $user = User::where('email', $fields['email'])->first();
+        $user = User::where('email',$request->email)->first();
 
         if(!$user || !Hash::check($fields['password'], $user->password)) {
-            return response([
-                'message' => 'Bad creds'
-            ], 401);
+            return response()->json(["status" => 0, 'errorMessage' => 'Bad credentials']);
         }
 
         $token = $user->createToken('myapptoken')->plainTextToken;
 
-        $response = [
-            'user' => $user,
-            'token' => $token
-        ];
+        $user_type = NULL;
+        switch ($user->role_id) {
+            case 3:
+                $user_type = 'worker';
+            break;
+            case 4:
+                $user_type = 'driver';
+            break;
+            case 5:
+                $user_type = 'client';
+            break;
+            default :
 
-        return response($response, 201);
+            break;
+        }
+        return response()->json([
+            'status' => 1,
+            'type' => $user_type, 
+            'token' => $token
+        ]);
     }
 
     public function logout(Request $request) {
@@ -227,6 +247,4 @@ class UserController extends Controller
             'message' => 'Location Updated!'
         ], 200);
     }
-
-
 }

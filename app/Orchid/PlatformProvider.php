@@ -28,6 +28,30 @@ class PlatformProvider extends OrchidServiceProvider
     public function registerMainMenu(): array
     {
         return [
+            Menu::make('Narudzbine')
+                ->icon('note')
+                ->route('order.list'),
+            
+            Menu::make(__('Vozaci'))
+            ->icon('user')
+            ->route('driver.list')
+            ->permission('platform.systems.users')
+            ->title('Korisnici'),
+
+
+            Menu::make(__('Serviseri'))
+            ->icon('user')
+            ->route('worker.list')
+            ->permission('platform.systems.users'),
+
+
+            Menu::make(__('Klijenti'))
+            ->icon('user')
+            ->route('client.list')
+            ->permission('platform.systems.users'),
+          
+           
+/*
             Menu::make('Example screen')
                 ->icon('monitor')
                 ->route('platform.example')
@@ -93,6 +117,7 @@ class PlatformProvider extends OrchidServiceProvider
                 ->icon('lock')
                 ->route('platform.systems.roles')
                 ->permission('platform.systems.roles'),
+*/
         ];
     }
 

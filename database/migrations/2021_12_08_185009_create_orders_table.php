@@ -22,7 +22,7 @@ class CreateOrdersTable extends Migration
             $table->json('services')->nullable();
             $table->foreignId('client_id')->nullable();
             $table->json('order_info')->nullable();
-            $table->json('paymment_info')->nullable();
+            $table->json('payment_info')->nullable();
             $table->json('takeout_date')->nullable();
             $table->json('delivery_date')->nullable();
             $table->decimal('price');

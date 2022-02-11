@@ -19,27 +19,11 @@ use Orchid\Support\Facades\Toast;
 
 class UserProfileScreen extends Screen
 {
-    /**
-     * Display header name.
-     *
-     * @var string
-     */
+
     public $name = 'My account';
 
-    /**
-     * Display header description.
-     *
-     * @var string
-     */
     public $description = 'Update your account details such as name, email address and password';
 
-    /**
-     * Query data.
-     *
-     * @param Request $request
-     *
-     * @return array
-     */
     public function query(Request $request): array
     {
         return [
@@ -47,22 +31,16 @@ class UserProfileScreen extends Screen
         ];
     }
 
-    /**
-     * Button commands.
-     *
-     * @return Action[]
-     */
     public function commandBar(): array
     {
         return [];
     }
 
-    /**
-     * @return \Orchid\Screen\Layout[]
-     */
+
     public function layout(): array
     {
         return [
+            /*
             Layout::block(UserEditLayout::class)
                 ->title(__('Profile Information'))
                 ->description(__("Update your account's profile information and email address."))
@@ -72,7 +50,7 @@ class UserProfileScreen extends Screen
                         ->icon('check')
                         ->method('save')
                 ),
-
+                */
             Layout::block(ProfilePasswordLayout::class)
                 ->title(__('Update Password'))
                 ->description(__('Ensure your account is using a long, random password to stay secure.'))

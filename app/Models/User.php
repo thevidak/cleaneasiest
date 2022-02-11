@@ -7,16 +7,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
+use App\Models\UserProfile;
+
 use Orchid\Platform\Models\User as Authenticatable;
 
-class User extends Authenticatable implements MustVerifyEmail
-{
+class User extends Authenticatable implements MustVerifyEmail {
+
     use HasApiTokens, HasFactory, Notifiable;
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array
-     */
+
     protected $fillable = [
         'name',
         'email',
@@ -33,33 +31,18 @@ class User extends Authenticatable implements MustVerifyEmail
         'location',
     ];
 
-    /**
-     * The attributes excluded from the model's JSON form.
-     *
-     * @var array
-     */
     protected $hidden = [
         'password',
         'remember_token',
         'permissions',
     ];
 
-    /**
-     * The attributes that should be cast to native types.
-     *
-     * @var array
-     */
     protected $casts = [
         'permissions'          => 'array',
         'email_verified_at'    => 'datetime',
         'location' => 'array',
     ];
 
-    /**
-     * The attributes for which you can use filters in url.
-     *
-     * @var array
-     */
     protected $allowedFilters = [
         'id',
         'name',
@@ -67,11 +50,6 @@ class User extends Authenticatable implements MustVerifyEmail
         'permissions',
     ];
 
-    /**
-     * The attributes for which can use sort in url.
-     *
-     * @var array
-     */
     protected $allowedSorts = [
         'id',
         'name',
@@ -80,12 +58,20 @@ class User extends Authenticatable implements MustVerifyEmail
         'created_at',
     ];
 
+    public function profile() {
+        return $this->hasOne(UserProfile::class);
+    }
+
     public function isAdmin() {
         return $this->role_id === Role::ADMIN ? true : false;
     }
 
     public function userRole() {
         return $this->role_id;
+    }
+
+    public function getFullNameAttribute () {
+        return $this->name . " " . $this->surname; 
     }
 
 }

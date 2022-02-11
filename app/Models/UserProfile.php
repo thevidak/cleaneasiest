@@ -5,9 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class RejectedOrders extends Model
+class UserProfile extends Model
 {
     use HasFactory;
-
-    protected $fillable = ['order_id','user_id', 'note'];
 }

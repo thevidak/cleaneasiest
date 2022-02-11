@@ -18,6 +18,19 @@ use App\Orchid\Screens\User\UserProfileScreen;
 use Illuminate\Support\Facades\Route;
 use Tabuna\Breadcrumbs\Trail;
 
+use App\Orchid\Screens\OrderEditScreen;
+use App\Orchid\Screens\OrderListScreen;
+
+use App\Orchid\Screens\DriverListScreen;
+use App\Orchid\Screens\DriverEditScreen;
+
+use App\Orchid\Screens\WorkerListScreen;
+use App\Orchid\Screens\WorkerEditScreen;
+
+use App\Orchid\Screens\ClientListScreen;
+use App\Orchid\Screens\ClientEditScreen;
+
+
 /*
 |--------------------------------------------------------------------------
 | Dashboard Routes
@@ -30,8 +43,7 @@ use Tabuna\Breadcrumbs\Trail;
 */
 
 // Main
-Route::screen('/main', PlatformScreen::class)
-    ->name('platform.main');
+Route::screen('/main', OrderListScreen::class)->name('platform.main');
 
 // Platform > Profile
 Route::screen('profile', UserProfileScreen::class)
@@ -112,4 +124,17 @@ Route::screen('example-editors', ExampleTextEditorsScreen::class)->name('platfor
 Route::screen('example-cards', ExampleCardsScreen::class)->name('platform.example.cards');
 Route::screen('example-advanced', ExampleFieldsAdvancedScreen::class)->name('platform.example.advanced');
 
-//Route::screen('idea', 'Idea::class','platform.screens.idea');
+
+Route::screen('order/{order?}', OrderEditScreen::class)->name('order.edit');
+Route::screen('orders', OrderListScreen::class)->name('order.list');
+
+Route::screen('driver/{driver?}', DriverEditScreen::class)->name('driver.edit');
+Route::screen('drivers', DriverListScreen::class)->name('driver.list');
+
+Route::screen('worker/{worker?}', WorkerEditScreen::class)->name('worker.edit');
+Route::screen('workers', WorkerListScreen::class)->name('worker.list');
+
+Route::screen('client/{client?}', ClientEditScreen::class)->name('client.edit');
+Route::screen('clients', ClientListScreen::class)->name('client.list');
+
+

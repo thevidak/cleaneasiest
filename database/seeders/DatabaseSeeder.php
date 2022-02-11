@@ -60,18 +60,94 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('users')->insert([
-            ['name' => 'admin', 'email' => 'admin@test.com', 'password' => Hash::make('testtest'), 'role_id' => 1, 'surname' => 'test', 'country' => 'Srbija', 'country' => 'Srbija','address' => 'Cerska 12', 'city' => 'Beograd', 'municipality' => 'Dorcol', 'zip' => '11000', 'phone' => '0641234567', 'location' => json_encode(["latitude" => 44.813206, "longitude" => 20.429670])],
-            //['name' => 'manager', 'email' => 'manager@test.com', 'password' => Hash::make('testtest'), 'role_id' => 2, 'surname' => 'test', 'country' => 'Srbija', 'country' => 'Srbija','address' => 'Cerska 12', 'city' => 'Beograd', 'municipality' => 'Dorcol', 'zip' => '11000', 'phone' => '0641234567' , 'location' => json_encode(["latitude" => 44.813206, "longitude" => 20.429670])],
-            ['name' => 'worker', 'email' => 'worker@test.com', 'password' => Hash::make('testtest'), 'role_id' => 3, 'surname' => 'test', 'country' => 'Srbija', 'country' => 'Srbija','address' => 'Cerska 12', 'city' => 'Beograd', 'municipality' => 'Dorcol', 'zip' => '11000', 'phone' => '0641234567' , 'location' => json_encode(["latitude" => 44.81567284269272, "longitude" => 20.437035670230046])],
-            ['name' => 'driver', 'email' => 'driver@test.com', 'password' => Hash::make('testtest'), 'role_id' => 4, 'surname' => 'test', 'country' => 'Srbija', 'country' => 'Srbija','address' => 'Cerska 12', 'city' => 'Beograd', 'municipality' => 'Dorcol', 'zip' => '11000', 'phone' => '0641234567' , 'location' => json_encode(["latitude" => 44.813206, "longitude" => 20.429670])],
-            ['name' => 'client', 'email' => 'client@test.com', 'password' => Hash::make('testtest'), 'role_id' => 5, 'surname' => 'test', 'country' => 'Srbija', 'country' => 'Srbija','address' => 'Cerska 12', 'city' => 'Beograd', 'municipality' => 'Dorcol', 'zip' => '11000', 'phone' => '0641234567' , 'location' => json_encode(["latitude" => 44.81319114386074, "longitude" => 20.460338821181438])],
-            //['name' => 'worker2', 'email' => 'worker2@test.com', 'password' => Hash::make('testtest'), 'role_id' => 3, 'surname' => 'test', 'country' => 'Srbija', 'country' => 'Srbija','address' => 'Cerska 12', 'city' => 'Beograd', 'municipality' => 'Dorcol', 'zip' => '11000', 'phone' => '0641234567' , 'location' => json_encode(["latitude" => 44.813206, "longitude" => 20.429670])]
+            [
+                'name' => 'admin', 
+                'email' => 'admin@test.com', 
+                'password' => Hash::make('testtest'), 
+                'role_id' => 1, 
+                'surname' => 'test', 
+                'country' => 'Srbija', 
+                'address' => 'Cerska 12', 
+                'city' => 'Beograd', 
+                'municipality' => 'Dorcol', 
+                'zip' => '11000', 
+                'phone' => '0641234567', 
+                'location' => json_encode(["latitude" => 44.813206, "longitude" => 20.429670]),
+                'permissions' => json_encode(["platform.systems.roles" => TRUE, "platform.systems.users" => TRUE, "platform.systems.attachment" => TRUE, "platform.index" => TRUE])
+            ],
+            [
+                'name' => 'worker', 
+                'email' => 'worker@test.com', 
+                'password' => Hash::make('testtest'), 
+                'role_id' => 3, 
+                'surname' => 'test', 
+                'country' => 'Srbija', 
+                'address' => 'Cerska 12', 
+                'city' => 'Beograd', 
+                'municipality' => 'Dorcol', 
+                'zip' => '11000', 
+                'phone' => '0641234567' , 
+                'location' => json_encode(["latitude" => 44.81567284269272, "longitude" => 20.437035670230046]),
+                'permissions' => NULL
+            ],
+            [
+                'name' => 'driver', 
+                'email' => 'driver@test.com', 
+                'password' => Hash::make('testtest'), 
+                'role_id' => 4, 'surname' => 'test', 
+                'country' => 'Srbija', 
+                'country' => 'Srbija',
+                'address' => 'Cerska 12', 
+                'city' => 'Beograd', 
+                'municipality' => 'Dorcol', 
+                'zip' => '11000', 
+                'phone' => '0641234567' , 
+                'location' => json_encode(["latitude" => 44.813206, "longitude" => 20.429670]),
+                'permissions' => NULL
+            ],
+            [
+                'name' => 'client', 
+                'email' => 'client@test.com', 
+                'password' => Hash::make('testtest'), 
+                'role_id' => 5, 
+                'surname' => 'test', 
+                'country' => 'Srbija', 
+                'country' => 'Srbija',
+                'address' => 'Cerska 12', 
+                'city' => 'Beograd', 
+                'municipality' => 'Dorcol', 
+                'zip' => '11000', 
+                'phone' => '0641234567' , 
+                'location' => json_encode(["latitude" => 44.81319114386074, "longitude" => 20.460338821181438]),
+                'permissions' => NULL
+            ]
         ]);
 
-        DB::table('shops')->insert([
-            ['name' => 'Test shop 1', 'description' => "Just a test shop", 'user_id' => 3],
-            ['name' => 'Second 1', 'description' => "THe best shop", 'user_id' => 4],
+        DB::table('user_profiles')->insert([
+            [
+                'user_id' => 3,
+                'licence_plate' => 'BG-023AB'
+            ]
         ]);
-
+        DB::table('orders')->insert([
+            [
+                'status' => 1,
+                'client_id' => 4,
+                'services' => json_encode([["service_ids" => [1, 2], "weight_class_id" => 2, 'note'=>'just a note']]),
+                'payment_info' => json_encode(['type' => 0]),
+                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+3 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'price' => 750,
+            ],
+            [
+                'status' => 1,
+                'client_id' => 4,
+                'services' => json_encode([["service_ids" => [1, 2, 3], "weight_class_id" => 1, 'note'=>'just a note']]),
+                'payment_info' => json_encode(['type' => 0]),
+                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'price' => 600,
+            ]
+        ]);
     }
 }
