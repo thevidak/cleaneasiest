@@ -28,11 +28,22 @@ class PlatformProvider extends OrchidServiceProvider
     public function registerMainMenu(): array
     {
         return [
-            Menu::make('Narudzbine')
+            Menu::make('Nove')
+                ->icon('note')
+                ->route('order.newlist')
+                ->title('Narudžbine'),
+            Menu::make('Stopirane')
+                ->icon('note')
+                ->route('order.stalledlist'),
+            Menu::make('Završene')
+                ->icon('note')
+                ->route('order.finishedlist'),
+            Menu::make('Sve')
                 ->icon('note')
                 ->route('order.list'),
             
-            Menu::make(__('Vozaci'))
+            
+                Menu::make(__('Vozaci'))
             ->icon('user')
             ->route('driver.list')
             ->permission('platform.systems.users')
@@ -48,6 +59,23 @@ class PlatformProvider extends OrchidServiceProvider
             Menu::make(__('Klijenti'))
             ->icon('user')
             ->route('client.list')
+            ->permission('platform.systems.users'),
+
+
+            Menu::make(__('Servisi'))
+            ->icon('user')
+            ->route('service.list')
+            ->permission('platform.systems.users')
+            ->title('Podesavanja'),
+
+            Menu::make(__('Tezine'))
+            ->icon('user')
+            ->route('weight.list')
+            ->permission('platform.systems.users'),
+
+            Menu::make(__('Razlozi odbijanja'))
+            ->icon('user')
+            ->route('reason.list')
             ->permission('platform.systems.users'),
           
            

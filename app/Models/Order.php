@@ -4,12 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+
 use App\Models\Users;
+use App\Models\Service;
+use App\Models\ServiceType;
+use App\Models\Price;
 
 use Orchid\Filters\Filterable;
 use Orchid\Screen\AsSource;
 
-abstract class OrderdStatus {
+abstract class OrderStatus {
     const ORDER_IN_CREATION = 0;
     const ORDER_CREATED = 1;
     const WORKER_ACCEPTED = 2;
@@ -58,9 +62,17 @@ class Order extends Model
         $services = $this->services;
         $price = 0;
 
-        foreach ($services as $service_group) {
-            foreach ($service_group["service_ids"] as $service_id) {
-                $service_price = Price::where("service_id", $service_id)->where("weight_class_id", $service_group["weight_class_id"])->first()->value;
+        foreach ($services as $service) {
+            $service_type = Service::where('id', $service['service_id'])->first()->type;
+            if ($service_type==ServiceType::WEIGHTABLE) {
+                $service_price = Price::where("service_id",$service["service_id"])->where("weight_class_id", $service["weight_class_id"])->first()->value;
+                $price += $service_price;
+            }
+            else if ($service_type==ServiceType::COUNTABLE) {
+                $service_price = 0;
+                foreach ($service['clothes'] as $clothing_item) {
+                    $service_price +=Price::where("service_id",$service["service_id"])->where("weight_class_id", $clothing_item["clothes_type_id"])->first()->value * $clothing_item["count"];
+                }
                 $price += $service_price;
             }
         }
@@ -68,6 +80,62 @@ class Order extends Model
         $this->price = $price;
         $this->save();
         return $price;
+    }
+
+    /*********************************************************************************************************************************************************
+                                                                            ATTRIBUTES
+    *********************************************************************************************************************************************************/
+
+    public function getProgressAttribute() {
+        $progress = 0;
+        switch ($this->status) {
+            case OrderStatus::ORDER_IN_CREATION :
+                $progress = 0.1;
+                break;
+            case OrderStatus::ORDER_CREATED :
+                $progress = 0.2;
+                break;
+            case OrderStatus::WORKER_ACCEPTED :
+                $progress = 0.3;
+                break;
+            case OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT :
+                $progress = 0.4;
+                break;
+            case OrderStatus::DRIVER_DELIVERY_TO_WORKER :
+                $progress = 0.5;
+                break;
+            case OrderStatus::WORKER_PROCESSING :
+                $progress = 0.6;
+                break;
+            case OrderStatus::WORKER_FINISHED :
+                $progress = 0.7;
+                break;
+            case OrderStatus::DRIVER_TAKEOUT_FROM_WORKER :
+                $progress = 0.8;
+                break;
+            case OrderStatus::DRIVER_DELIVERY_TO_CLIENT :
+                $progress = 0.9;
+                break;
+            case OrderStatus::ORDER_DELIVERED :
+                $progress = 1;
+                break;
+            case OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT :
+                $progress = 0.4;
+                break;
+            case OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT :
+                $progress = 0.9;
+                break;
+            case OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER :
+                $progress = 0.8;
+                break;
+            case OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER :
+                $progress = 0.5;
+                break;
+            default :
+                $progress = 0;
+                break;
+        }
+        return $progress;
     }
 
     public function getLocationsAttribute() {
@@ -111,40 +179,42 @@ class Order extends Model
         return $this->hasMany(User::class, 'id', 'client_id');
     }
 */
+
+
     public function getClientNameAttribute () {
         $client = User::where('id', $this->client_id)->first();
         return $client->name . " " . $client->surname;
     }
     public function getStatusFormatedAttribute () {
         switch ($this->status) {
-            case OrderdStatus::ORDER_IN_CREATION :
+            case OrderStatus::ORDER_IN_CREATION :
                 return 'Narudzbina se kreira';
             break;
-            case OrderdStatus::ORDER_CREATED :
+            case OrderStatus::ORDER_CREATED :
                 return 'Narudzbina kreirana';
             break;
-            case OrderdStatus::WORKER_ACCEPTED :
+            case OrderStatus::WORKER_ACCEPTED :
                 return 'Serviser prihvatio';
             break;
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_CLIENT :
+            case OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT :
                 return 'Vozac preuzeo od klijenta';
             break;
-            case OrderdStatus::DRIVER_DELIVERY_TO_WORKER :
+            case OrderStatus::DRIVER_DELIVERY_TO_WORKER :
                 return 'Vozac prevozi do servisera';
             break;
-            case OrderdStatus::WORKER_PROCESSING :
+            case OrderStatus::WORKER_PROCESSING :
                 return 'Servis';
             break;
-            case OrderdStatus::WORKER_FINISHED :
+            case OrderStatus::WORKER_FINISHED :
                 return 'Serviser zavrsio';
             break;
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_WORKER :
+            case OrderStatus::DRIVER_TAKEOUT_FROM_WORKER :
                 return 'Vozac preuzima od servisera';
             break;
-            case OrderdStatus::DRIVER_DELIVERY_TO_CLIENT :
+            case OrderStatus::DRIVER_DELIVERY_TO_CLIENT :
                 return 'Vozac dostavlja do klijenta';
             break;
-            case OrderdStatus::ORDER_DELIVERED :
+            case OrderStatus::ORDER_DELIVERED :
                 return 'Narudzbina zavrsena';
             break;
             default :
@@ -160,5 +230,59 @@ class Order extends Model
     public function getServiceTextAttribute () {
         return '<div>123</div>';
         return json_encode($this->services);
+    }
+
+    public function servicesGroupFormated () {
+        $full_price = 0;
+        $result = [];
+        foreach ($this->services as $service) {
+            $service_obj = Service::where('id',$service['service_id'])->first();
+            $service_type = $service_obj->type;
+
+            if ($service_type == ServiceType::WEIGHTABLE) {
+                $price = Price::where('service_id',$service['service_id'])->where('weight_class_id',$service["weight_class_id"])->first()->value * 1;
+                $result[] = [
+                    "id" => $service_obj->id,
+                    "type" => $service_obj->name,
+                    "price" => $price
+                ];
+                $full_price += $price;
+            }
+            else if ($service_type == ServiceType::COUNTABLE) {
+                $price = 0;
+                foreach ($service['clothes'] as $clothing_item) {
+                    $price += Price::where('service_id',$service['service_id'])->where('weight_class_id',$clothing_item["clothes_type_id"])->first()->value * $clothing_item["count"];
+                }
+                $result[] = [
+                    "id" => $service_obj->id,
+                    "type" => $service_obj->name,
+                    "price" => $price
+                ];
+                $full_price += $price;
+            }
+        }
+
+        $output = [];
+
+        foreach ($result as $service) {
+            $repeated = FALSE;
+            foreach ($output as $key=>$single) {
+                if ($service['id'] == $single['id']) {
+                    $output[$key]["price"] += $service['price'];
+                    $repeated = TRUE;
+                    break;
+                }
+            }
+            if (!$repeated) {
+                $output[] = $service;
+            }
+        }
+
+
+
+        return [
+            "services" => $output,
+            "fullPrice" => $full_price
+        ];
     }
 }

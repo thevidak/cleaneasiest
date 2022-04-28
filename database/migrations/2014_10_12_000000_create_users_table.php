@@ -20,18 +20,19 @@ class CreateUsersTable extends Migration
             $table->id();
             $table->string('name');
             $table->string('surname');
-            $table->string('country');
-            $table->string('address');
-            $table->string('city');
-            $table->string('municipality');
-            $table->string('zip');
-            $table->string('phone');
-            $table->string('email')->unique();
+            $table->string('address')->nullable();
+            $table->string('city')->nullable();
+            $table->string('municipality')->nullable();
+            $table->string('phone')->nullable();
+            $table->string('country')->nullable();
+            $table->string('zip')->nullable();
+            $table->string('email')->nullable()->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->json('location')->nullable();
-            $table->string('password');
+            $table->string('password')->nullable();
             $table->rememberToken();
             $table->foreignIdFor(Role::class)->default(5);
+            $table->string('profile_image')->nullable();
             $table->timestamps();
         });
     }

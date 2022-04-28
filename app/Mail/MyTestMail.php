@@ -7,7 +7,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
-class NewUserNotification extends Mailable
+class MyTestMail extends Mailable
 {
     use Queueable, SerializesModels;
 
@@ -16,9 +16,9 @@ class NewUserNotification extends Mailable
      *
      * @return void
      */
-    public function __construct()
+    public function __construct($details)
     {
-        //
+        $this->details = $details;
     }
 
     /**

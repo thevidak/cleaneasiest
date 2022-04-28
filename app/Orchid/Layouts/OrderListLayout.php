@@ -18,7 +18,7 @@ class OrderListLayout extends Table {
             TD::make('id', 'JBP')
                 ->render(function (Order $order) {
                     return Link::make($order->id)
-                        ->route('order.edit', $order);
+                        ->route('order.show', $order);
                 }),
             TD::make('statusFormated', 'Status'),
             TD::make('client_id', 'Klijent')->render(function (Order $order) {

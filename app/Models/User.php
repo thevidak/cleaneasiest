@@ -29,12 +29,15 @@ class User extends Authenticatable implements MustVerifyEmail {
         'zip',
         'phone',
         'location',
+        'profile_image',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
         'permissions',
+        'email_verified_at',
+        'role_id',
     ];
 
     protected $casts = [
@@ -57,6 +60,10 @@ class User extends Authenticatable implements MustVerifyEmail {
         'updated_at',
         'created_at',
     ];
+
+    public function linkedSocialAccounts() {
+        return $this->hasMany(LinkedSocialAccount::class);
+    }
 
     public function profile() {
         return $this->hasOne(UserProfile::class);

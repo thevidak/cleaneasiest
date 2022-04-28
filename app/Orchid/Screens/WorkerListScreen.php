@@ -14,21 +14,18 @@ use Orchid\Support\Facades\Toast;
 
 use App\Orchid\Layouts\WorkerListLayout;
 
-class WorkerListScreen extends Screen
-{
+class WorkerListScreen extends Screen {
     public $name = 'Serviseri';
 
     public $description = 'Spisak svih registrovanih servisera';
 
-    public function query(): array
-    {
+    public function query(): array {
         return [
             'users' => User::where('role_id',3)->paginate()
         ];
     }
 
-    public function commandBar(): array
-    {
+    public function commandBar(): array {
         return [
             Link::make(__('Dodaj Novog'))
                 ->icon('plus')

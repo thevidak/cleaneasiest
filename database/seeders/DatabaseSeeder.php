@@ -19,6 +19,21 @@ class DatabaseSeeder extends Seeder
 
     public function run()
     {
+        DB::table('options')->insert([
+            [
+                'name' => "WORKER_REJECT_REASONS",
+                'value' => json_encode(["Prezauzet", "Razlog 2", "Razlog 3"])
+            ],
+            [
+                'name' => "DRIVER_REJECT_REASONS",
+                'value' => json_encode(["Prezauzet", "Lokacija Predaleko", "Razlog 3"])
+            ],
+            [
+                'name' => "DRIVER_CANT_LOAD_FROM_CLIENT_REASONS",
+                'value' => json_encode(["Klijent nije na adresi", "Klijent ne odgovara na telefon"])
+            ],
+        ]);
+
         DB::table('user_roles')->insert([
             ['id' => 1, 'name' => 'admin'],
             ['id' => 2, 'name' => 'manager'],
@@ -28,10 +43,22 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('services')->insert([
-            ['name' => 'Pranje', 'description' => "Just a test service"],
-            ['name' => 'Peglanje', 'description' => "Just a test service"],
-            ['name' => 'Susenje', 'description' => "Just a test service"]
+            ['name' => 'Pranje po artiklu', 'type' => 1]
         ]);
+
+        DB::table('services')->insert([
+            ['name' => 'Pranje po kg'],
+            ['name' => 'Peglanje'],
+            ['name' => 'Premium pranje']
+        ]);
+
+        DB::table('clothes_types')->insert([
+            ['name' => 'Košulja'],
+            ['name' => 'Pantalone'],
+            ['name' => 'Suknja'],
+            ['name' => 'Kaput']
+        ]);
+
 
         DB::table('weight_classes')->insert([
             ['name' => '0-500g'],
@@ -56,7 +83,12 @@ class DatabaseSeeder extends Seeder
             ['service_id' => 3, 'weight_class_id' => 1, 'value' => 150],
             ['service_id' => 3, 'weight_class_id' => 2, 'value' => 250],
             ['service_id' => 3, 'weight_class_id' => 3, 'value' => 500],
-            ['service_id' => 3, 'weight_class_id' => 4, 'value' => 1000]
+            ['service_id' => 3, 'weight_class_id' => 4, 'value' => 1000],
+            // Susenje
+            ['service_id' => 4, 'weight_class_id' => 1, 'value' => 150],
+            ['service_id' => 4, 'weight_class_id' => 2, 'value' => 250],
+            ['service_id' => 4, 'weight_class_id' => 3, 'value' => 500],
+            ['service_id' => 4, 'weight_class_id' => 4, 'value' => 1000]
         ]);
 
         DB::table('users')->insert([
@@ -129,25 +161,118 @@ class DatabaseSeeder extends Seeder
                 'licence_plate' => 'BG-023AB'
             ]
         ]);
+
+        
         DB::table('orders')->insert([
             [
                 'status' => 1,
                 'client_id' => 4,
-                'services' => json_encode([["service_ids" => [1, 2], "weight_class_id" => 2, 'note'=>'just a note']]),
+                'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
                 'payment_info' => json_encode(['type' => 0]),
-                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
-                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+3 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
-                'price' => 750,
-            ],
-            [
-                'status' => 1,
-                'client_id' => 4,
-                'services' => json_encode([["service_ids" => [1, 2, 3], "weight_class_id" => 1, 'note'=>'just a note']]),
-                'payment_info' => json_encode(['type' => 0]),
+                'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
                 'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
                 'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
-                'price' => 600,
-            ]
+                'price' => 750,
+                'worker_id' => 2,
+                'driver_id' => 3,
+            ],
+            [
+                'status' => 2,
+                'client_id' => 4,
+                'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
+                'payment_info' => json_encode(['type' => 0]),
+                'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
+                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'price' => 750,
+                'worker_id' => 2,
+                'driver_id' => 3,
+            ],
+            [
+                'status' => 3,
+                'client_id' => 4,
+                'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
+                'payment_info' => json_encode(['type' => 0]),
+                'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
+                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'price' => 750,
+                'worker_id' => 2,
+                'driver_id' => 3,
+            ],
+            [
+                'status' => 4,
+                'client_id' => 4,
+                'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
+                'payment_info' => json_encode(['type' => 0]),
+                'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
+                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'price' => 750,
+                'worker_id' => 2,
+                'driver_id' => 3,
+            ],
+            [
+                'status' => 5,
+                'client_id' => 4,
+                'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
+                'payment_info' => json_encode(['type' => 0]),
+                'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
+                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'price' => 750,
+                'worker_id' => 2,
+                'driver_id' => 3,
+            ],
+            [
+                'status' => 6,
+                'client_id' => 4,
+                'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
+                'payment_info' => json_encode(['type' => 0]),
+                'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
+                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'price' => 750,
+                'worker_id' => 2,
+                'driver_id' => 3,
+            ],
+            [
+                'status' => 7,
+                'client_id' => 4,
+                'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
+                'payment_info' => json_encode(['type' => 0]),
+                'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
+                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'price' => 750,
+                'worker_id' => 2,
+                'driver_id' => 3,
+            ],
+            [
+                'status' => 8,
+                'client_id' => 4,
+                'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
+                'payment_info' => json_encode(['type' => 0]),
+                'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
+                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'price' => 750,
+                'worker_id' => 2,
+                'driver_id' => 3,
+            ],
+            [
+                'status' => 9,
+                'client_id' => 4,
+                'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
+                'payment_info' => json_encode(['type' => 0]),
+                'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
+                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'price' => 750,
+                'worker_id' => 2,
+                'driver_id' => 3,
+            ],
         ]);
+
     }
 }

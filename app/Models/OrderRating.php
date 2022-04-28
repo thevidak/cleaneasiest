@@ -9,7 +9,7 @@ class OrderRating extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['order_id', 'service_ratings', 'note'];
+    protected $fillable = ['order_id', 'user_id', 'service_ratings', 'note'];
 
     protected $casts = [
         'service_ratings' => 'array'

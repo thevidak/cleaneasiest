@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Orchid\Screens;
+namespace App\Orchid\Screens\Order;
 
 use Illuminate\Http\Request;
 use Orchid\Screen\Fields\Input;

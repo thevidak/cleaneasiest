@@ -3,7 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Models\OrderdStatus;
+use App\Models\OrderStatus;
+use App\Models\ServiceType;
 use App\Models\Price;
 use App\Models\RejectedOrders;
 use App\Models\Service;
@@ -11,6 +12,8 @@ use App\Models\Shop;
 use App\Models\User;
 use App\Models\WeightClass;
 use App\Models\OrderRating;
+use App\Models\Options;
+use App\Models\StatusChange;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -43,9 +46,13 @@ class OrderController extends Controller{
         if ($minutes < 60) {
             return $minutes . "min";
         }
-        else {
+        else if ($minutes < 1440){
             $hours = (int)($minutes/60);
-            return $hours . "h " . $minutes%60 . "min";
+            return $hours . "h";
+        }
+        else {
+            $days = (int)($minutes/1440);
+            return $days == 1 ? $days . " dan" : $days . " dana";
         }
     }
 
@@ -80,7 +87,7 @@ class OrderController extends Controller{
             $order = Order::create([
                 'services' => [$request->service],
                 'client_id' => Auth::id(),
-                'status' => OrderdStatus::ORDER_IN_CREATION,
+                'status' => OrderStatus::ORDER_IN_CREATION,
                 'price' => 0
             ]);
             $order->calculatePrice();
@@ -90,24 +97,28 @@ class OrderController extends Controller{
 
     public function createOrder(Request $request) {
 
-        $request->validate(['payment_info' => 'required', 'takeout_date' => 'required', 'delivery_date' => 'required']);
+        $request->validate(['payment_info' => 'required', 'takeout_date' => 'required']);
 
-        $current_order = Order::where('client_id', Auth::id())->where('status', 0)->first();
+        $current_order = Order::where('client_id', Auth::id())->where('status', OrderStatus::ORDER_IN_CREATION)->first();
 
         if (isset($current_order)) {
             $current_order->payment_info = $request->payment_info;
             $current_order->takeout_date = $request->takeout_date;
-            $current_order->delivery_date = $request->delivery_date;
             if (isset($request->order_info)) {
                 $order_info = $request->order_info;
-                if (isset($order_info["country"]) and isset($order_info["address"]) and isset($order_info["city"]) and isset($order_info["municipality"]) and isset($order_info["zip"])) {
+                if (isset($order_info["address"]) && $order_info["address"] != '') {
+                    $order_info["location"] = googleAPIGetGeoLocationFromAddress($order_info["address"]);
+                    $current_order->order_info = $order_info;
+                }
+                else if (isset($order_info["location"])) {
+                    $order_info['address'] = 'Bulevar Zorana Djindjica 22, Beograd';
                     $current_order->order_info = $order_info;
                 }
                 else {
                     return response()->json(["status" => 0, "errorMessage" => "Some address info is missing"]);
                 }
             }
-            $current_order->status = 1;
+            $current_order->status = OrderStatus::ORDER_CREATED;
             $current_order->save();
             return response()->json([
                 "status" => 1
@@ -152,19 +163,45 @@ class OrderController extends Controller{
     
     *********************************************************************************************************************************************************/
 
-    // return number of new orders and accepted orders
+    // return (just) a number of new orders and accepted orders
     public function workerGetNumberOfTotalOrders() {
-        //need to implement rejected orders
-        $new_orders_count = Order::where('status',OrderdStatus::ORDER_CREATED)->count();
-        $accepted_orders_count = Order::where('worker_id', Auth::id())->count();
+        // we have to exclude rejected orders from new orders
+        $rejected_orders = RejectedOrders::where('user_id', Auth::id())->get();
+        $pending_orders = Order::where('status',OrderStatus::ORDER_CREATED)->get();
 
-        if ($new_orders_count == 0 && $accepted_orders_count == 0) {
-            return response()->json(["status" => 0, "errorMessage" => 'No orders']);
+        foreach ($rejected_orders as $rejected_order) {
+            $r_order_id = $rejected_order->order_id;
+            foreach ($pending_orders as $key=>$pending_order) {
+                $p_order_id = $pending_order->id;
+                if ($p_order_id == $r_order_id) {
+                    unset($pending_orders[$key]);
+                }
+            }
         }
+
+        $new_orders_count = count($pending_orders);
+        $accepted_orders_count = Order::where('worker_id', Auth::id())->where('status', '!=', OrderStatus::ORDER_DELIVERED)->count();
+
+        if ($new_orders_count == 0 && $accepted_orders_count == 0) { return response()->json(["status" => 0, "errorMessage" => 'No orders']);}
+
+        // if the order timer is passed we do not show it
+        
+        $result = [];
+        foreach ($pending_orders as $order) {
+            $takeout_datetime = new \DateTime($order->takeout_date["date"] . " " . $order->takeout_date["end_time"]);
+            $now = new \DateTime();
+
+            $difference_in_seconds = $takeout_datetime>$now ? $takeout_datetime->format('U') - $now->format('U') : 0;
+
+            if ($difference_in_seconds > 0) {
+                $result[] = $order;
+            }
+        }
+        
 
         return response()->json([
             "status" => 1,
-            "newOrders" => $new_orders_count,
+            "newOrders" => count($result), //$new_orders_count, 
             "acceptedOrders" => $accepted_orders_count
         ]);
     }
@@ -173,15 +210,26 @@ class OrderController extends Controller{
     public function workerGetListOfNewOrders() {
         
         $worker = Auth::user();
-        $new_orders = Order::where('status',OrderdStatus::ORDER_CREATED)->get();
 
-        if ($new_orders->isEmpty()) {
-            return response()->json(["status" => 0, "errorMessage" => "No new orders"]);
+        // we have to exclude rejected orders from new orders
+        $rejected_orders = RejectedOrders::where('user_id', Auth::id())->get();
+        $pending_orders = Order::where('status',OrderStatus::ORDER_CREATED)->get();
+
+        foreach ($rejected_orders as $rejected_order) {
+            $r_order_id = $rejected_order->order_id;
+            foreach ($pending_orders as $key=>$pending_order) {
+                $p_order_id = $pending_order->id;
+                if ($p_order_id == $r_order_id) {
+                    unset($pending_orders[$key]);
+                }
+            }
         }
 
-        $result = [];
+        if ($pending_orders->isEmpty()) {return response()->json(["status" => 0, "errorMessage" => "No new orders"]);}
 
-        foreach ($new_orders as $order) {
+        
+        $result = [];
+        foreach ($pending_orders as $order) {
             $takeout_datetime = new \DateTime($order->takeout_date["date"] . " " . $order->takeout_date["end_time"]);
             $now = new \DateTime();
 
@@ -193,11 +241,18 @@ class OrderController extends Controller{
                     'time' => $this->formatTime($difference_in_seconds)
                 ];
             }
+
+            else {
+                /*
+                $result[] = [
+                    'jbp' => $order->id,
+                    'time' => 'Isteklo'
+                ];
+                */
+            }
         }
 
-        if (empty($result)) {
-            return response()->json(["status" => 0, "errorMessage" => "No new orders"]);
-        }
+        if (empty($result)) { return response()->json(["status" => 0, "errorMessage" => "No new orders"]);}
 
         return response()->json([
             "status" => 1,
@@ -239,15 +294,17 @@ class OrderController extends Controller{
     }
 
     // reurn list of accepted orders
+    
     public function workerGetListOfAcceptdeOrders() {
         $worker = Auth::user();
         $destinations = "";
-        $new_orders = Order::where('worker_id',Auth::id())->get();
+        $new_orders = Order::where('worker_id',Auth::id())->where('status', '!=', OrderStatus::ORDER_DELIVERED)->get();
 
-        if ($new_orders->isEmpty()) {
-            return response()->json(["status" => 0, "errorMessage" => "No new orders"]);
-        }
+        if ($new_orders->isEmpty()) return response()->json(["status" => 0, "errorMessage" => "No new orders"]);
 
+        // caluclating time for all orders in one call
+
+        /*
         foreach ($new_orders as $order) {
             $driver = User::where('id',$order->client_id)->first();
             $destinations .= $driver->city . "," . $driver->address . "|";
@@ -271,9 +328,27 @@ class OrderController extends Controller{
             $result[] = [
                 'jbp' => $order->id,
                 'time' => $time,
-                "fractionFinished" => $order->status / 10
+                "fractionFinished" => $order->progress
             ];
         }
+        */
+
+        $result = [];
+        
+        foreach ($new_orders as $order) {
+            $takeout_datetime = new \DateTime($order->delivery_date["date"] . " " . $order->delivery_date["end_time"]);
+            $now = new \DateTime();
+
+            $difference_in_seconds = $takeout_datetime>$now ? $this->formatTime(($takeout_datetime->format('U') - $now->format('U'))) : 'Isteklo';
+
+            $result[] = [
+                'jbp' => $order->id,
+                'time' => $difference_in_seconds,
+                "fractionFinished" => $order->progress
+            ];
+        }
+
+
         return response()->json([
             "status" => 1,
             "result" => $result
@@ -291,18 +366,35 @@ class OrderController extends Controller{
 
         $service_list_prep = [];
 
-        foreach ($services as $service_group) {
-            $weight = WeightClass::where('id',$service_group['weight_class_id'])->first()->name;
-            foreach ($service_group["service_ids"] as $service_id) {
-                $name = Service::where('id',$service_id)->first()->name;
-                $service_list_prep[] = ['type' => $name, 'weight' => $weight];
+        foreach ($services as $single_service) {
+            $service = Service::where('id',$single_service['service_id'])->first();
+            if ($service->type == ServiceType::WEIGHTABLE) {
+                $weight = WeightClass::where('id',$single_service['weight_class_id'])->first()->name;
+                $service_list_prep[] = [
+                    'type' => 'weightable',
+                    'name' => $service->name, 
+                    'weight' => $weight
+                ];
+            }
+            else if ($service->type == ServiceType::COUNTABLE) {
+                $count = 0;
+                $clothes = $single_service['clothes'];
+                foreach ($clothes as $single_clothing_item) {
+                    $count += $single_clothing_item['count'];
+                }
+                $service_list_prep[] = [
+                    'type' => 'countable',
+                    'name' => $service->name, 
+                    'count' => $count
+                ];
             }
         }
         return response()->json([
             "status" => 1,
             "services" => $service_list_prep,
-            "clientDate" => $order->takeout_date["date"],
-            "clientTime" => $order->takeout_date["start_time"]. "-" . $order->takeout_date["end_time"]
+            "deliveryDate" => isset($order->delivery_date) ? $order->delivery_date : NULL
+            //"clientDate" => $order->delivery_date["date"],
+            //"clientTime" => $order->delivery_date["start_time"]. "-" . $order->delivery_date["end_time"]
         ]);
     }
 
@@ -313,7 +405,7 @@ class OrderController extends Controller{
         if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Order unavailable"]);
 
         if ($request->serviceAccepted == FALSE) {
-            if (isset($order) && $order->status == OrderdStatus::ORDER_CREATED) {
+            if (isset($order) && $order->status == OrderStatus::ORDER_CREATED) {
                 $rejected_order = RejectedOrders::where('order_id',$order->id)->where('user_id', Auth::id())->first();
                 if (isset($rejected_order)) {
                     return response()->json(["status" => 0, "errorMessage" => "Order Already Rejected"]);
@@ -333,9 +425,11 @@ class OrderController extends Controller{
             }
         }
         else {
-            if ($order->status == OrderdStatus::ORDER_CREATED) {
-                $order->status = OrderdStatus::WORKER_ACCEPTED;
+            if ($order->status == OrderStatus::ORDER_CREATED) {
+                if (!isset($request->deliveryDate)) return response()->json(["status" => 0, "errorMessage" => "Datum dostave nije izabran."]);
+                $order->status = OrderStatus::WORKER_ACCEPTED;
                 $order->worker_id = Auth::id();
+                $order->delivery_date = $request->deliveryDate;
                 $order->save();
                 return response()->json([
                     "status" => 1
@@ -362,32 +456,33 @@ class OrderController extends Controller{
         $client_location = User::where('id',$order->client_id)->first()->location;
 
         switch ($order->status) {
-            case OrderdStatus::WORKER_ACCEPTED:
+            case OrderStatus::WORKER_ACCEPTED:
                 # time is not available
                 break;
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_CLIENT:
+            case OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT:
                 # time from driver to client + delta time + time from client to worker
                 $remaining_time = $this->calculateDistance($driver_location,$client_location)->value + 300 + $this->calculateDistance($client_location,$worker_location)->value;
                 break;
-            case OrderdStatus::DRIVER_DELIVERY_TO_WORKER:
+            case OrderStatus::DRIVER_DELIVERY_TO_WORKER:
                 # time from driver to worker
                 $remaining_time = $this->calculateDistance($driver_location,$worker_location)->value;
                 break;
-            case OrderdStatus::WORKER_PROCESSING:
+            case OrderStatus::WORKER_PROCESSING:
                 # time not available
                 break;
-            case OrderdStatus::WORKER_FINISHED:
+            case OrderStatus::WORKER_FINISHED:
                 # time not available
+                $remaining_time = $this->calculateDistance($driver_location,$worker_location)->value;
                 break;
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_WORKER:
+            case OrderStatus::DRIVER_TAKEOUT_FROM_WORKER:
                 # time from driver to worker
                 $remaining_time = $this->calculateDistance($driver_location,$worker_location)->value;
                 break;
-            case OrderdStatus::DRIVER_DELIVERY_TO_CLIENT:
+            case OrderStatus::DRIVER_DELIVERY_TO_CLIENT:
                 # time from driver to client
                 $remaining_time = $this->calculateDistance($driver_location,$client_location)->value;
                 break;
-            case OrderdStatus::ORDER_DELIVERED:
+            case OrderStatus::ORDER_DELIVERED:
                 # time unavailable
                 break;
             default:
@@ -426,8 +521,8 @@ class OrderController extends Controller{
         if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Order unavailable"]);
 
         if ($request->isLoaded == TRUE) {
-            if ($order->status == OrderdStatus::DRIVER_DELIVERY_TO_WORKER) {
-                $order->status = OrderdStatus::WORKER_PROCESSING;
+            if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER) {
+                $order->status = OrderStatus::WORKER_PROCESSING;
                 $order->save();
                 return response()->json([
                     "status" => 1
@@ -445,8 +540,8 @@ class OrderController extends Controller{
         if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
 
         if ($request->isDelivered == TRUE) {
-            if ($order->status == OrderdStatus::WORKER_FINISHED) {
-                $order->status = OrderdStatus::DRIVER_TAKEOUT_FROM_WORKER;
+            if ($order->status == OrderStatus::WORKER_FINISHED) {
+                $order->status = OrderStatus::DRIVER_TAKEOUT_FROM_WORKER;
                 $order->save();
                 return response()->json([
                     "status" => 1
@@ -466,8 +561,8 @@ class OrderController extends Controller{
         $order = Order::where('id',$request->jbp)->first();
         if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
 
-        if ($order->status == OrderdStatus::WORKER_PROCESSING) {
-            $order->status = OrderdStatus::WORKER_FINISHED;
+        if ($order->status == OrderStatus::WORKER_PROCESSING) {
+            $order->status = OrderStatus::WORKER_FINISHED;
             $order->save();
             return response()->json([
                 "status" => 1
@@ -483,67 +578,102 @@ class OrderController extends Controller{
         $order = Order::where('id',$request->jbp)->first();
         if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
 
+        $driver = User::where('id', $order->driver_id)->first();
+
         $order_status = '';
         $now = new \DateTime();
+        $date_limit = $order->getDateTime('delivery', 'end');
+        //$date_limit = $order->getDateTime('takeout', 'end')->add(new \DateInterval('P1D'));
+
+        if ($date_limit < $now) {
+            $date_limit = "Isteklo";
+        }
+        else {
+            //$date_limit =  $date_limit->format('d.m.Y H:i');
+            $date_limit = $this->timeDifference($date_limit, $now);
+        }
 
         switch ($order->status) {
-            case OrderdStatus::WORKER_ACCEPTED:
+            case OrderStatus::WORKER_ACCEPTED:
                 return response()->json([
                     "status" => 1,
-                    "orderStatus" => 'isporuka',
-                    "remainingTime" => $this->timeDifference($order->getDateTime('delivery', 'end'),$now),
+                    "orderStatus" => 'cekanje',
+                    //"remainingTime" => $this->timeDifference($order->getDateTime('delivery', 'end'),$now),
+                    "remainingTime" => $date_limit,
                     "serviceDate" => $order->getDateTime('takeout', 'end')->format("Y-m-d"),
                     "serviceTime" => $order->getDateTime('takeout', 'end')->format("H:i"),
                     "deliveryDate" => $order->getDateTime('delivery', 'end')->format("Y-m-d"),
                     "deliveryTime" => $order->getDateTime('delivery', 'end')->format("H:i"),
                 ]);
                 break;
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_CLIENT:
+            case OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT:
                 return response()->json([
                     "status" => 1,
-                    "orderStatus" => 'isporuka',
-                    "remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),
-                    "serviceDate" => $order->getDateTime('takeout', 'end')->format("Y-m-d"),
-                    "serviceTime" => $order->getDateTime('takeout', 'end')->format("H:i"),
+                    "orderStatus" => 'preuzimanje',
+                    //"remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),  
+                    "remainingTime" =>$this->formatTime(
+                        googleAPIGetTimeRemainingInSeconds($driver->location, $order->order_info['location']) + 
+                        googleAPIGetTimeRemainingInSeconds($driver->location, Auth::user()->location)),
+                    //"serviceDate" => $order->getDateTime('takeout', 'end')->format("Y-m-d"),
+                    //"serviceTime" => $order->getDateTime('takeout', 'end')->format("H:i"),
                     "deliveryDate" => $order->getDateTime('delivery', 'end')->format("Y-m-d"),
                     "deliveryTime" => $order->getDateTime('delivery', 'end')->format("H:i"),
                 ]);
                 break;
-            case OrderdStatus::DRIVER_DELIVERY_TO_WORKER:
+            case OrderStatus::DRIVER_DELIVERY_TO_WORKER:
                 return response()->json([
                     "status" => 1,
-                    "orderStatus" => 'isporuka',
-                    "remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),
-                    "serviceDate" => $order->getDateTime('takeout', 'end')->format("Y-m-d"),
-                    "serviceTime" => $order->getDateTime('takeout', 'end')->format("H:i"),
+                    "orderStatus" => 'preuzimanje',
+                    //"remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),
+                    "remainingTime" =>$this->formatTime(
+                        googleAPIGetTimeRemainingInSeconds($driver->location, Auth::user()->location)),
+                    //"serviceDate" => $order->getDateTime('takeout', 'end')->format("Y-m-d"),
+                    //"serviceTime" => $order->getDateTime('takeout', 'end')->format("H:i"),
                     "deliveryDate" => $order->getDateTime('delivery', 'end')->format("Y-m-d"),
                     "deliveryTime" => $order->getDateTime('delivery', 'end')->format("H:i"),
                 ]);
                 break;
-            case OrderdStatus::WORKER_PROCESSING:
+            case OrderStatus::WORKER_PROCESSING:
                 return response()->json([
                     "status" => 1,
                     "orderStatus" => 'usluga',
-                    "remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),
+                    "remainingTime" => $this->timeDifference($order->getDateTime('delivery', 'end'),$now),
+                    //"remainingTime" => $date_limit,
                     "deliveryDate" => $order->getDateTime('delivery', 'end')->format("Y-m-d"),
                     "deliveryTime" => $order->getDateTime('delivery', 'end')->format("H:i"),
                 ]);
                 break;
-            case OrderdStatus::WORKER_FINISHED:
+            case OrderStatus::WORKER_FINISHED:
                 return response()->json([
                     "status" => 1,
-                    "orderStatus" => 'preuzimanje',
-                    "remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),
+                    "orderStatus" => 'usluga',
+                    "serviceFinished" => true,
+                    //"remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),
+                    "remainingTime" => 0,
+                    "deliveryDate" => $order->getDateTime('delivery', 'end')->format("Y-m-d"),
+                    "deliveryTime" => $order->getDateTime('delivery', 'end')->format("H:i"),
                 ]);
                 break;
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_WORKER:
+            case OrderStatus::DRIVER_TAKEOUT_FROM_WORKER:
                 return response()->json([
                     "status" => 1,
-                    "orderStatus" => 'preuzimanje',
-                    "remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),
+                    "orderStatus" => 'dostava',
+                    //"remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),
+                    "remainingTime" =>$this->formatTime(
+                        googleAPIGetTimeRemainingInSeconds($driver->location, Auth::user()->location) + 
+                        googleAPIGetTimeRemainingInSeconds(Auth::user()->location, $order->order_info['location'])),
                 ]);
                 break;
-            case OrderdStatus::DRIVER_DELIVERY_TO_CLIENT:
+            case OrderStatus::DRIVER_DELIVERY_TO_CLIENT:
+                return response()->json([
+                    "status" => 1,
+                    "orderStatus" => 'dostava',
+                    //"remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),
+                    "remainingTime" =>$this->formatTime(
+                        googleAPIGetTimeRemainingInSeconds($driver->location, $order->order_info['location'])),
+                ]);
+                break;
+            case OrderStatus::ORDER_DELIVERED:
                 return response()->json([
                     "status" => 1,
                     "orderStatus" => 'realizovano'
@@ -555,6 +685,150 @@ class OrderController extends Controller{
         }
     }
 
+    public function workerRejectReasons () {
+        $options = Options::where('name','WORKER_REJECT_REASONS')->first();
+
+        if (!isset($options)) return response()->json(["status" => 0, 'errorMessage' => 'Nema informacija na serveru']);
+
+        return response()->json([
+            "status" => 1,
+            "options" => $options->value
+        ]);
+    }
+
+    public function workerOrderData(Request $request) {
+        $request->validate(['jbp' => 'required']);
+
+        $order = Order::where('id',$request->jbp)->first();
+        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Order unavailable"]);
+        
+        $remaining_time = 0;
+        $driver = $order->driver_id == NULL ? NULL : User::where('id',$order->driver_id)->first();
+
+        $worker_location = Auth::user()->location;
+        $driver_location = isset($driver) ? $driver->location : NULL;
+        $client_location = User::where('id',$order->client_id)->first()->location;
+
+        $acceptedStatus = NULL;
+        $order_status = NULL;
+
+        // this api is called only during delivery and takeout
+        switch ($order->status) {
+            case OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT:
+                //$remaining_time = $this->calculateDistance($driver_location,$client_location)->value + 300 + $this->calculateDistance($client_location,$worker_location)->value;
+                $remaining_time = $this->formatTime(
+                    googleAPIGetTimeRemainingInSeconds($driver->location, $order->order_info['location']) + 
+                    googleAPIGetTimeRemainingInSeconds($driver->location, Auth::user()->location));
+                $order_status = 'preuzimanje';
+                break;
+            case OrderStatus::DRIVER_DELIVERY_TO_WORKER:
+                //$remaining_time = $this->calculateDistance($driver_location,$worker_location)->value;
+                $remainingTime =$this->formatTime(
+                    googleAPIGetTimeRemainingInSeconds($driver->location, Auth::user()->location));
+                $order_status = 'preuzimanje';
+                break;
+            case OrderStatus::DRIVER_TAKEOUT_FROM_WORKER:
+                # time from driver to worker
+                //$remaining_time = $this->calculateDistance($driver_location,$worker_location)->value;
+                $remaining_time = $this->formatTime(
+                    googleAPIGetTimeRemainingInSeconds($driver->location, Auth::user()->location) + 
+                    googleAPIGetTimeRemainingInSeconds(Auth::user()->location, $order->order_info['location']));
+                $order_status = 'dostava';
+                break;
+            case OrderStatus::DRIVER_DELIVERY_TO_CLIENT:
+                # time from driver to client
+                //$remaining_time = $this->calculateDistance($driver_location,$client_location)->value;
+                $remaining_time = $this->formatTime(
+                    googleAPIGetTimeRemainingInSeconds($driver->location, $order->order_info['location']));
+                $order_status = 'dostava';
+                break;
+
+            case OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT:
+                # time unavailable
+                $acceptedStatus = NULL;
+            case OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT:
+                # time unavailable
+                $acceptedStatus = NULL;
+            case OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER:
+                # time unavailable
+                $acceptedStatus = NULL;
+            case OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER:
+                # time unavailable
+                $acceptedStatus = NULL;
+                break;
+            default:
+                # nothing
+                break;
+        }
+        return response()->json([
+            "status" => 1,
+            "orderStatus" => $order_status,
+            "remainingTime" => $remaining_time,
+            "driverName" => isset($driver) ? $driver->name . " " . $driver->surname : NULL,
+            "driverPhone" => isset($driver) ? $driver->phone : NULL,
+            "licencePlate" => isset($driver) ? $driver->profile->licence_plate : NULL,
+            "acceptedStatus" => $acceptedStatus,
+            "driverLatitude" => isset($driver) ? $driver->location['latitude'] : NULL,
+            "driverLongitude" => isset($driver) ? $driver->location['longitude'] : NULL
+        ]);
+    }
+
+
+    public function workerChangeOrderStatus (Request $request) {
+        $request->validate(['jbp' => 'required', 'status' => 'required', 'type' => 'required']);
+        $note = isset($request->note) ? $request->note : NULL;
+
+        $order = Order::where('id',$request->jbp)->first();
+        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Order unavailable"]);
+
+        switch ($request->type) {
+            case 'load' :
+                // order loaded from driver
+                if ($request->status == TRUE) {
+                    if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER) {
+                        $order->status = OrderStatus::WORKER_PROCESSING;
+                        $order->save();
+                        return response()->json(["status" => 1]);
+                    }
+                }
+                else {
+
+                }
+                break;
+            case 'ready' : 
+                // finished order processing, order ready for takeout
+                if ($request->status == TRUE) {
+                    if ($order->status == OrderStatus::WORKER_PROCESSING) {
+                        $order->status = OrderStatus::WORKER_FINISHED;
+                        $order->save();
+                        return response()->json(["status" => 1]);
+                    }
+                }
+                else {
+                    
+                }
+                break;
+            case 'delivery' :
+                // driver took the order
+                if ($request->status == TRUE) {
+                    if ($order->status == OrderStatus::WORKER_FINISHED) {
+                        $order->status = OrderStatus::DRIVER_TAKEOUT_FROM_WORKER;
+                        $order->save();
+                        return response()->json(["status" => 1]);
+                    }
+                }
+                else {
+                    
+                }
+                break;
+            default :
+                // unknown type
+                return response()->json(["status" => 0, "errorMessage" => "Type unrecognized"]); 
+                break;
+        }
+
+        return response()->json(["status" => 0, "errorMessage" => "Error changing the order status"]); 
+    }
 
     /*********************************************************************************************************************************************************
                                                                         
@@ -567,9 +841,27 @@ class OrderController extends Controller{
     *********************************************************************************************************************************************************/
 
     public function driverGetNumberOfTotalOrders (Request $request) {
-        //need to implement rejected orders
-        $new_orders_count = Order::where('status',OrderdStatus::WORKER_ACCEPTED)->count();
-        $accepted_orders_count = Order::where('driver_id', Auth::id())->count();
+        
+        $rejected_orders = RejectedOrders::where('user_id', Auth::id())->get();
+        $pending_orders = Order::where('status',OrderStatus::WORKER_ACCEPTED)
+            ->orWhere('status',OrderStatus::WORKER_FINISHED)->get();
+
+        foreach ($rejected_orders as $rejected_order) {
+            $r_order_id = $rejected_order->order_id;
+            foreach ($pending_orders as $key=>$pending_order) {
+                $p_order_id = $pending_order->id;
+                if ($p_order_id == $r_order_id) {
+                    unset($pending_orders[$key]);
+                }
+            }
+        }
+
+        $new_orders_count = count($pending_orders);
+        //$accepted_orders_count = Order::where('driver_id', Auth::id())->count();
+        $accepted_orders_count = Order::where('driver_id',Auth::id())
+            ->where('status', '!=', OrderStatus::WORKER_PROCESSING)
+            ->where('status', '!=', OrderStatus::ORDER_DELIVERED)
+            ->where('status', '!=', OrderStatus::WORKER_FINISHED)->count();
 
         if ($new_orders_count == 0 && $accepted_orders_count == 0) return response()->json(["status" => 0, "errorMessage" => "No orders avalable"]);
 
@@ -582,21 +874,34 @@ class OrderController extends Controller{
 
     public function driverGetListOfNewOrders() {
         $driver = Auth::user();
-        $destinations = "";
-        $new_orders = Order::where('status',OrderdStatus::WORKER_ACCEPTED)->get();
 
-        if ($new_orders->isEmpty()) {
-            return response()->json(["status" => 0, "errorMessage" => "No new orders"]);
+        $rejected_orders = RejectedOrders::where('user_id', Auth::id())->get();
+        $pending_orders = Order::where('status',OrderStatus::WORKER_ACCEPTED)
+            ->orWhere('status',OrderStatus::WORKER_FINISHED)->get();
+
+        foreach ($rejected_orders as $rejected_order) {
+            $r_order_id = $rejected_order->order_id;
+            foreach ($pending_orders as $key=>$pending_order) {
+                $p_order_id = $pending_order->id;
+                if ($p_order_id == $r_order_id) {
+                    unset($pending_orders[$key]);
+                }
+            }
         }
+
+        if ($pending_orders->isEmpty()) {return response()->json(["status" => 0, "errorMessage" => "No new orders"]);}
+
+        $destinations = "";
 
         $result = [];
         $now = new \DateTime();
 
-        foreach ($new_orders as $order) {
-            $takeout_end_datetime = $order->getDateTime('takeout', 'end');
+        foreach ($pending_orders as $order) {
+            $takeout_end_datetime = $order->getDateTime('takeout', 'start');
 
             $result[] = [
                 'jbp' => $order->id,
+                'type' => $order->status == OrderStatus::WORKER_ACCEPTED ? 'preuzimanje' : 'dostava',
                 'time' => $this->timeDifference($takeout_end_datetime,$now)
             ];
         }
@@ -610,7 +915,10 @@ class OrderController extends Controller{
     public function driverGetListOfAcceptdeOrders() {
         $driver = Auth::user();
         $destinations = "";
-        $new_orders = Order::where('driver_id',Auth::id())->get();
+        $new_orders = Order::where('driver_id',Auth::id())
+            ->where('status', '!=', OrderStatus::WORKER_PROCESSING)
+            ->where('status', '!=', OrderStatus::ORDER_DELIVERED)
+            ->where('status', '!=', OrderStatus::WORKER_FINISHED)->get();
 
         if ($new_orders->isEmpty()) {
             return response()->json(["status" => 0, "errorMessage" => "No new orders"]);
@@ -634,12 +942,19 @@ class OrderController extends Controller{
         $counter = 0;
         
         foreach ($new_orders as $order) {
-            $time = $calulated_distances->rows[0]->elements[$counter]->duration->text;
+            $time = 0;
+            try {
+                $time = $calulated_distances->rows[0]->elements[$counter]->duration->text;
+            }
+            catch (\Exception $e) {
+                $time = 0;
+            }
+            
             $counter++;
             $result[] = [
                 'jbp' => $order->id,
                 'time' => $time,
-                "fractionFinished" => $order->status / 10
+                "fractionFinished" => $order->progress
             ];
         }
         return response()->json([
@@ -648,53 +963,76 @@ class OrderController extends Controller{
         ]);
     }
 
-    public function DriverGetOrderStatus (Request $request) {
+    public function driverGetOrderStatus (Request $request) {
         $request->validate(['jbp' => 'required']);
 
-        $order = Order::where('id',$request->jbp)->first();
+        $order = Order::where('id',$request->jbp)->where('driver_id',Auth::id())->first();
         if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
 
-        $order_status = '';
-        $now = new \DateTime();
+        $client = User::where('id', $order->client_id)->first();
+        $worker = User::where('id', $order->worker_id)->first();
 
         switch ($order->status) {
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_CLIENT:
-            case OrderdStatus::DRIVER_DELIVERY_TO_WORKER:
+            case OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT:
                 return response()->json([
                     'status' => 1,
-                    "orderStatus" => 'preuzimanje',
-                    "remainingTime" => $this->timeDifference($order->getDateTime('delivery', 'end'),$now),
-                    "deliveryDate" => $order->getDateTime('takeout', 'end')->format("Y-m-d"),
-                    "deliveryTime" => $order->getDateTime('takeout', 'end')->format("H:i"),
+                    'orderStatus' => 'preuzimanje',
+                    'type' => 'takeout',
+                    'target' => [
+                        'address' => $order->order_info['address'],
+                        'distance' => googleAPIGetDistanceAndDurationFormated(Auth::user()->location, $order->order_info['location']),
+                        'name' => $client->name . ' ' . $client->surname,
+                        'phone' => $client->phone,
+                        'location' => $order->order_info['location']
+                    ]
                 ]);
                 break;
-            case OrderdStatus::WORKER_PROCESSING:
-            case OrderdStatus::WORKER_FINISHED:
+            case OrderStatus::DRIVER_DELIVERY_TO_WORKER:
                 return response()->json([
                     'status' => 1,
-                    "orderStatus" => 'izvrsilac',
-                    "isLoadAndNotDelivery" => false,
-                    "remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),
-                    "deliveryDate" => $order->getDateTime('delivery', 'end')->format("Y-m-d"),
-                    "deliveryTime" => $order->getDateTime('delivery', 'end')->format("H:i"),
+                    'orderStatus' => 'isporuka',
+                    'type' => 'takeout',
+                    'target' => [
+                        'address' => $worker->address,
+                        'distance' => googleAPIGetDistanceAndDurationFormated(Auth::user()->location, $worker->location),
+                        'name' => $worker->name . ' ' . $worker->surname,
+                        'phone' => $worker->phone,
+                        'location' => $worker->location
+                    ]
                 ]);
                 break;
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_WORKER:
-            case OrderdStatus::DRIVER_DELIVERY_TO_CLIENT:
+
+            case OrderStatus::DRIVER_TAKEOUT_FROM_WORKER:
                 return response()->json([
                     'status' => 1,
-                    "orderStatus" => 'isporuka',
-                    "deliveryDate" => $order->getDateTime('delivery', 'end')->format("Y-m-d"),
-                    "deliveryTime" => $order->getDateTime('delivery', 'end')->format("H:i"),
+                    'orderStatus' => 'preuzimanje',
+                    'type' => 'delivery',
+                    'target' => [
+                        'address' => $worker->address,
+                        'distance' => googleAPIGetDistanceAndDurationFormated(Auth::user()->location, $worker->location),
+                        'name' => $worker->name . ' ' . $worker->surname,
+                        'phone' => $worker->phone,
+                        'location' => $worker->location
+                    ]
                 ]);
                 break;
-            case OrderdStatus::ORDER_DELIVERED:
+            case OrderStatus::DRIVER_DELIVERY_TO_CLIENT:
                 return response()->json([
                     'status' => 1,
-                    "orderStatus" => 'realizovano'
+                    'orderStatus' => 'isporuka',
+                    'type' => 'delivery',
+                    'target' => [
+                        'address' => $order->order_info['address'],
+                        'distance' => googleAPIGetDistanceAndDurationFormated(Auth::user()->location, $order->order_info['location']),
+                        'name' => $client->name . ' ' . $client->surname,
+                        'phone' => $client->phone,
+                        'location' => $order->order_info['location']
+                    ]
                 ]);
                 break;
-            case OrderdStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT:
+
+
+            case OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT:
                 return response()->json([
                     'status' => 1,
                     "orderStatus" => 'preuzimanje',
@@ -710,6 +1048,7 @@ class OrderController extends Controller{
                 ]);
                 break;
         }
+
     }
 
     public function driverAcceptOrder(Request $request) {
@@ -718,16 +1057,16 @@ class OrderController extends Controller{
         if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
 
         if ($request->orderAccepted == TRUE) {
-            if ($order->status == OrderdStatus::WORKER_ACCEPTED) {
-                $order->status = OrderdStatus::DRIVER_TAKEOUT_FROM_CLIENT;
+            if ($order->status == OrderStatus::WORKER_ACCEPTED) {
+                $order->status = OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT;
                 $order->driver_id = Auth::id();
                 $order->save();
                 return response()->json([
                     "status" => 1
                 ]);
             }
-            else if ($order->status == OrderdStatus::WORKER_FINISHED) {
-                $order->status = OrderdStatus::DRIVER_TAKEOUT_FROM_WORKER;
+            else if ($order->status == OrderStatus::WORKER_FINISHED) {
+                $order->status = OrderStatus::DRIVER_TAKEOUT_FROM_WORKER;
                 $order->driver_id = Auth::id();
                 $order->save();
                 return response()->json([
@@ -742,7 +1081,7 @@ class OrderController extends Controller{
             }
         }
         else if ($request->orderAccepted == FALSE) {
-            $note = (isset($request->rejectedNote)) ? $request->rejectedNote : NULL;
+            $note = (isset($request->note)) ? $request->note : NULL;
             $rejected_order = RejectedOrders::where('order_id',$order->id)->where('user_id', Auth::id())->first();
             if (isset($rejected_order)) {
                 return response()->json([
@@ -770,81 +1109,42 @@ class OrderController extends Controller{
         }
     }
 
-    public function driverGetOrderData(Request $request) {
+    // data for new orders
+    public function driverNewOrderData(Request $request) {
         $request->validate(['jbp' => 'required', 'driverLatitude' => 'required', 'driverLongitude' => 'required']);
 
         $order = Order::where('id',$request->jbp)->first();
         if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
 
+        if ($order->status != OrderStatus::WORKER_ACCEPTED && $order->status != OrderStatus::WORKER_FINISHED) {
+            return response()->json(["status" => 0,"errorMessage" => "Narudzbina nedostupna"]);
+        }
+
         $client = User::where("id",$order->client_id)->first();
         $worker = User::where("id",$order->worker_id)->first();
 
-        $driver_location = [
+        Auth::user()->location = [
             "latitude" => $request->driverLatitude,
             "longitude" => $request->driverLongitude
         ];
-        $client_location = $client->location;
-        $worker_location = $worker->location;
+        Auth::user()->save();
 
-        $api_result = NULL;
-        $isClient = TRUE;
-        $type = 'preuzimanje';
-
-        switch ($order->status) {
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_CLIENT :
-                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $client_location);
-                $isClient = TRUE;
-                $type = 'preuzimanje';
-            break;
-            case OrderdStatus::DRIVER_DELIVERY_TO_WORKER :
-                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $worker_location);
-                $isClient = FALSE;
-                $type = 'isporuka';
-            break;
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_WORKER :
-                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $worker_location);
-                $isClient = FALSE;
-                $type = 'preuzimanje';
-            break;
-            case OrderdStatus::DRIVER_DELIVERY_TO_CLIENT :
-                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $client_location);
-                $isClient = TRUE;
-                $type = 'isporuka';
-            break;
-            default :
-                $api_result = ["duration"=>"", "distance"=>""];
-            break;
-        }
-
-        $duration = $api_result["duration"];
-        $distance = $api_result["distance"];
-
-        if ($isClient) {
-            return response()->json([
-                'status' => 1,
-                "type" => $type,
-                "remainingTime" => $duration,
-                "clientName" => $client->name . " " . $client->surname,
-                "clientPhone" => $client->phone,
-                "clientAddress" => $client->address . ", " . $client->city,
-                "clientLatitude" => $client->location["latitude"],
-                "clientLongitude" => $client->location["longitude"],
-                "distance" => $distance
-            ]); 
-        }
-        else {
-            return response()->json([
-                'status' => 1,
-                "type" => $type,
-                "remainingTime" => $duration,
-                "workerName" => $worker->name . " " . $client->surname,
-                "workerPhone" => $worker->phone,
-                "workerAddress" => $worker->address . ", " . $client->city,
-                "workerLatitude" => $worker->location["latitude"],
-                "workerLongitude" => $worker->location["longitude"],
-                "distance" => $distance
-            ]); 
-        }
+        return response()->json([
+            'status' => 1,
+            'type' => $order->status == OrderStatus::WORKER_ACCEPTED ? 'preuzimanje' : 'dostava',
+            'client' => [
+                'address' => $order->order_info['address'],
+                'distance' => googleAPIGetDistanceAndDurationFormated(Auth::user()->location, $order->order_info['location']),
+                'name' => $client->name . " " . $client->surname,
+                'phone' => $client->phone
+            ],
+            'worker' => [
+                'address' => $worker->address,
+                'distance' => googleAPIGetDistanceAndDurationFormated(Auth::user()->location, $worker->location),
+                'name' => $worker->name . " " . $worker->surname,
+                'phone' => $worker->phone
+            ]
+        ]); 
     }
 
     public function driverSetLoadedAcceptedOrder (Request $request) {
@@ -854,8 +1154,8 @@ class OrderController extends Controller{
         if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
 
         if ($request->isLoaded == TRUE) {
-            if ($order->status == OrderdStatus::DRIVER_TAKEOUT_FROM_CLIENT || $order->status == OrderdStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT) {
-                $order->status = OrderdStatus::DRIVER_DELIVERY_TO_WORKER;
+            if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT || $order->status == OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT) {
+                $order->status = OrderStatus::DRIVER_DELIVERY_TO_WORKER;
                 $order->save();
                 return response()->json([
                     "status" => 1
@@ -863,8 +1163,8 @@ class OrderController extends Controller{
             }
         }
         else if ($request->isLoaded == FALSE) {
-            if ($order->status == OrderdStatus::DRIVER_TAKEOUT_FROM_CLIENT) {
-                $order->status = OrderdStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT;
+            if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT) {
+                $order->status = OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT;
                 $order->save();
                 
                 return response()->json([
@@ -888,14 +1188,14 @@ class OrderController extends Controller{
         if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
 
         if ($request->isDelivered == TRUE) {
-            if ($order->status == OrderdStatus::DRIVER_DELIVERY_TO_WORKER || $order->status == OrderdStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER) {
-                $order->status = OrderdStatus::WORKER_PROCESSING;
+            if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER || $order->status == OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER) {
+                $order->status = OrderStatus::WORKER_PROCESSING;
                 $order->save();
                 return response()->json([
                     "status" => 1
                 ]);
             }
-            else if ($order->status == OrderdStatus::WORKER_PROCESSING) {
+            else if ($order->status == OrderStatus::WORKER_PROCESSING) {
                 return response()->json([
                     "status" => 1
                 ]);
@@ -903,8 +1203,8 @@ class OrderController extends Controller{
             return response()->json(["status" => 0, "errorMessage" => "Unable to set new status"]);
         }
         else if ($request->isDelivered == FALSE) {
-            if ($order->status == OrderdStatus::DRIVER_DELIVERY_TO_WORKER) {
-                $order->status = OrderdStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER;
+            if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER) {
+                $order->status = OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER;
                 $order->save();
                 return response()->json([
                     "status" => 1
@@ -922,8 +1222,8 @@ class OrderController extends Controller{
         if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
 
         if ($request->isLoaded == TRUE) {
-            if ($order->status == OrderdStatus::WORKER_FINISHED || $order->status == OrderdStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER) {
-                $order->status = OrderdStatus::DRIVER_TAKEOUT_FROM_WORKER;
+            if ($order->status == OrderStatus::WORKER_FINISHED || $order->status == OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER) {
+                $order->status = OrderStatus::DRIVER_DELIVERY_TO_CLIENT;
                 $order->save();
                 return response()->json([
                     "status" => 1
@@ -932,8 +1232,8 @@ class OrderController extends Controller{
             return response()->json(["status" => 0,"errorMessage" => "Cannot accept"]);
         }
         else if ($request->isLoaded == FALSE) {
-            if ($order->status == OrderdStatus::WORKER_FINISHED) {
-                $order->status = OrderdStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER;
+            if ($order->status == OrderStatus::WORKER_FINISHED) {
+                $order->status = OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER;
                 $order->save();
                 return response()->json([
                     "status" => 1
@@ -951,8 +1251,8 @@ class OrderController extends Controller{
         if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
 
         if ($request->isDelivered == TRUE) {
-            if ($order->status == OrderdStatus::DRIVER_DELIVERY_TO_CLIENT || $order->status == OrderdStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT) {
-                $order->status = OrderdStatus::ORDER_DELIVERED;
+            if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_CLIENT || $order->status == OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT) {
+                $order->status = OrderStatus::ORDER_DELIVERED;
                 $order->save();
                 return response()->json([
                     "status" => 1
@@ -961,8 +1261,8 @@ class OrderController extends Controller{
             return response()->json(["status" => 0, 'errorMessage' => 'Ubable to accept order, status invalid']);
         }
         else if ($request->isDelivered == FALSE) {
-            if ($order->status == OrderdStatus::DRIVER_DELIVERY_TO_CLIENT) {
-                $order->status = OrderdStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT;
+            if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_CLIENT) {
+                $order->status = OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT;
                 $order->save();
                 return response()->json([
                     "status" => 1
@@ -973,7 +1273,243 @@ class OrderController extends Controller{
         return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
     }
 
+    public function driverGetRejectReasons () {
+        $options = Options::where('name','DRIVER_REJECT_REASONS')->first();
 
+        if (!isset($options)) return response()->json(["status" => 0, 'errorMessage' => 'Nema informacija na serveru']);
+
+        return response()->json([
+            "status" => 1,
+            "options" => $options->value
+        ]);
+    }
+
+    public function driverGetUnableToLoadFromClientReasons () {
+        $options = Options::where('name','DRIVER_CANT_LOAD_FROM_CLIENT_REASONS')->first();
+
+        if (!isset($options)) return response()->json(["status" => 0, 'errorMessage' => 'Nema informacija na serveru']);
+
+        return response()->json([
+            "status" => 1,
+            "options" => $options->value
+        ]);
+    }
+
+    public function driverOrderData(Request $request) {
+        $request->validate(['jbp' => 'required', 'driverLatitude' => 'required', 'driverLongitude' => 'required']);
+
+        $order = Order::where('id',$request->jbp)->first();
+        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
+
+        $client = User::where("id",$order->client_id)->first();
+        $worker = User::where("id",$order->worker_id)->first();
+
+        $driver_location = [
+            "latitude" => $request->driverLatitude,
+            "longitude" => $request->driverLongitude
+        ];
+        $client_location = $client->location;
+        $worker_location = $worker->location;
+
+        $now = new \DateTime();
+
+        $api_result = NULL;
+        $isClient = TRUE;
+        $acceptedStatus = NULL;
+        $type = 'preuzimanje';
+
+        $delivery_time = null;
+
+        switch ($order->status) {
+            case OrderStatus::WORKER_ACCEPTED :
+                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $client_location);
+                $isClient = TRUE;
+                $type = 'cekanje';
+            break;
+            case OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT :
+                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $client_location);
+                $isClient = TRUE;
+                $type = 'preuzimanje';
+            break;
+            case OrderStatus::DRIVER_DELIVERY_TO_WORKER :
+                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $worker_location);
+                $isClient = FALSE;
+                $type = 'isporuka';
+            break;
+            case OrderStatus::WORKER_PROCESSING :
+                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $worker_location);
+                $isClient = FALSE;
+                $type = 'isporuka';
+                $acceptedStatus = TRUE;
+            break;
+            case OrderStatus::WORKER_FINISHED :
+                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $worker_location);
+                $isClient = FALSE;
+                $type = 'preuzimanje';
+                $acceptedStatus = TRUE;
+            break;
+            case OrderStatus::DRIVER_TAKEOUT_FROM_WORKER :
+                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $worker_location);
+                $isClient = FALSE;
+                $type = 'isporuka';
+            break;
+            case OrderStatus::DRIVER_DELIVERY_TO_CLIENT :
+                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $client_location);
+                $isClient = TRUE;
+                $type = 'isporuka';
+                $delivery_time = $this->timeDifference($order->getDateTime('delivery', 'end'),$now);
+            break;
+            case OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT :
+                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $client_location);
+                $isClient = TRUE;
+                $type = 'preuzimanje';
+                $acceptedStatus = FALSE;
+            break;
+            case OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT :
+                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $client_location);
+                $isClient = TRUE;
+                $type = 'isporuka';
+                $acceptedStatus = FALSE;
+            break;
+            case OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER :
+                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $worker_location);
+                $isClient = FALSE;
+                $type = 'preuzimanje';
+                $acceptedStatus = FALSE;
+            break;
+            case OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER :
+                $api_result = googleAPIGetDistanceAndDurationFormated($driver_location, $worker_location);
+                $isClient = FALSE;
+                $type = 'isporuka';
+                $acceptedStatus = FALSE;
+            break;
+            default :
+                $api_result = ["duration"=>"", "distance"=>""];
+            break;
+        }
+
+        $duration = $api_result["duration"];
+        $distance = $api_result["distance"];
+
+        if ($isClient) {
+            return response()->json([
+                'status' => 1,
+                "type" => $type,
+                "remainingTime" => $delivery_time != null ? $delivery_time : $duration,
+                "clientName" => $client->name . " " . $client->surname,
+                "clientPhone" => $client->phone,
+                "clientAddress" => $client->address . ", " . $client->city,
+                "clientLatitude" => $client->location["latitude"],
+                "clientLongitude" => $client->location["longitude"],
+                "distance" => $distance,
+                'acceptedStatus' => $acceptedStatus
+            ]); 
+        }
+        else {
+            return response()->json([
+                'status' => 1,
+                "type" => $type,
+                "remainingTime" => $delivery_time != null ? $delivery_time : $duration,
+                "clientName" => $worker->name . " " . $client->surname,
+                "clientPhone" => $worker->phone,
+                "clientAddress" => $worker->address . ", " . $client->city,
+                "clientLatitude" => $worker->location["latitude"],
+                "clientLongitude" => $worker->location["longitude"],
+                "distance" => $distance,
+                'acceptedStatus' => $acceptedStatus
+            ]); 
+        }
+    }
+
+    public function driverChangeOrderStatus(Request $request) {
+        // type : loadClient -> deliveryWorker -> loadWorker -> deliveryClient
+        $request->validate(['jbp' => 'required', 'status' => 'required', 'type' => 'required']);
+        $note = isset($request->note) ? $request->note : NULL;
+
+        $order = Order::where('id',$request->jbp)->where('driver_id', Auth::id())->first();
+        if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Unavailable order']);
+
+        switch ($request->type) {
+            case 'loadClient':
+                if ($request->status == TRUE) {
+                    if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT || $order->status == OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT) {
+                        $order->status = OrderStatus::DRIVER_DELIVERY_TO_WORKER;
+                        $order->save();
+                        return response()->json(["status" => 1]);
+                    }
+                }
+                else {
+                    if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT) {
+                        $order->status = OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT;
+                        $order->save();
+                        return response()->json(["status" => 1]);
+                    }
+                    return response()->json(["status" => 0, "errorMessage" => "Order status invalid"]);
+                }
+                break;
+            case 'deliveryWorker' :
+                if ($request->status == TRUE) {
+                    if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER || $order->status == OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER) {
+                        $order->status = OrderStatus::WORKER_PROCESSING;
+                        $order->save();
+                        return response()->json(["status" => 1]);
+                    }
+                    else if ($order->status == OrderStatus::WORKER_PROCESSING) {
+                        return response()->json(["status" => 1]);
+                    }
+                    return response()->json(["status" => 0, "errorMessage" => "Unable to set new status"]);
+                }
+                else {
+                    if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER) {
+                        $order->status = OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER;
+                        $order->save();
+                        return response()->json(["status" => 1]);
+                    }
+                    return response()->json(["status" => 0, "errorMessage" => "Unable to reject"]);
+                }
+                break;
+            case 'loadWorker' :
+                if ($request->status == TRUE) {
+                    if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_WORKER || $order->status == OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER) {
+                        $order->status = OrderStatus::DRIVER_DELIVERY_TO_CLIENT;
+                        $order->save();
+                        return response()->json(["status" => 1]);
+                    }
+                    return response()->json(["status" => 0,"errorMessage" => "Cannot accept"]);
+                }
+                else {
+                    if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_WORKER) {
+                        $order->status = OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER;
+                        $order->save();
+                        return response()->json(["status" => 1]);
+                    }
+                    return response()->json(["status" => 0,"errorMessage" => "Cannot reject"]);
+                }
+                break;
+            case 'deliveryClient' :
+                if ($request->status == TRUE) {
+                    if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_CLIENT || $order->status == OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT) {
+                        $order->status = OrderStatus::ORDER_DELIVERED;
+                        $order->save();
+                        return response()->json(["status" => 1]);
+                    }
+                    return response()->json(["status" => 0, 'errorMessage' => 'Ubable to accept order, status invalid']);
+                }
+                else {
+                    if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_CLIENT) {
+                        $order->status = OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT;
+                        $order->save();
+                        return response()->json(["status" => 1]);
+                    }
+                    return response()->json(["status" => 0, 'errorMessage' => 'Unable to reject order, status invalid']);
+                }
+                break;
+            default :
+                return response()->json(["status" => 0, 'errorMessage' => 'Unknown type']);
+                break;
+        }
+        return response()->json(["status" => 0, 'errorMessage' => 'Unable tp change status']);
+    }
 
 
     /*********************************************************************************************************************************************************
@@ -986,64 +1522,164 @@ class OrderController extends Controller{
     
     *********************************************************************************************************************************************************/
 
-    public function clientAddNewService(Request $request) {
-        $request->validate(['types' => 'required', 'weight' => 'required']);
+    public function clientGetServicePrices(Request $request) {
+        $request->validate(['service_id' => 'required']);
 
-        $note = (isset($request->note)) ? $request->note : NULL;
-        $current_order = Order::where('client_id', Auth::id())->where('status', OrderdStatus::ORDER_IN_CREATION)->first();
+        return response()->json([
+            'status' => 1,
+            'result' => Service::getPrices($request->service_id)
+        ]);
+    }
+    
+    
+    public function clientAddNewService(Request $request) {
+        $request->validate(['service_id' => 'required']);
+        $current_order = Order::where('client_id', Auth::id())->where('status', OrderStatus::ORDER_IN_CREATION)->first();
+        $service_type = Service::where('id',$request->service_id)->first()->type;
+
+        // For weightable services
+        if ($service_type == ServiceType::WEIGHTABLE) {
+            if (isset($current_order)) {
+                $tmp = $current_order->services;
+                array_push($tmp, [
+                    "service_id" => $request->service_id,
+                    "weight_class_id" => $request->weight_class_id
+                ]
+            );
+                $current_order->services = $tmp;
+                $current_order->save();
+                $current_order->calculatePrice();
+                return response()->json([
+                    "status" => 1
+                ]);
+            }
+            else {
+                $order = Order::create([
+                    'services' => [[
+                        "service_id" => $request->service_id,
+                        "weight_class_id" => $request->weight_class_id
+                    ]],
+                    'client_id' => Auth::id(),
+                    'status' => OrderStatus::ORDER_IN_CREATION,
+                    'price' => 0
+                ]);
+                $order->calculatePrice();
+                return response()->json([
+                    "status" => 1
+                ]);
+            }
+        }
+        
+        // For countable services
+        else {
+            if (isset($current_order)) {
+                $tmp = $current_order->services;
+                array_push($tmp, [
+                    "service_id" => $request->service_id,
+                    "clothes" => $request->clothes
+                ]
+            );
+                $current_order->services = $tmp;
+                $current_order->save();
+                $current_order->calculatePrice();
+                return response()->json([
+                    "status" => 1
+                ]);
+            }
+            else {
+                $order = Order::create([
+                    'services' => [[
+                        "service_id" => $request->service_id,
+                        "clothes" => $request->clothes
+                    ]],
+                    'client_id' => Auth::id(),
+                    'status' => OrderStatus::ORDER_IN_CREATION,
+                    'price' => 0
+                ]);
+                $order->calculatePrice();
+                return response()->json([
+                    "status" => 1
+                ]);
+            }
+        }
+
+       
+        return response()->json(["status" => 0,"errorMessage" => "Error"]);
+    }
+
+    public function clientDeleteService(Request $request) {
+        $request->validate(['serviceId' => 'required']);
+
+        $current_order = Order::where('client_id', Auth::id())->where('status', OrderStatus::ORDER_IN_CREATION)->first();
+        $service_to_remove = Service::where('id',$request->serviceId)->first();
+
+        if (!isset($service_to_remove)) return response()->json(["status" => 0,"errorMessage" => "Unavailable service name"]);
 
         if (isset($current_order)) {
-            $tmp = $current_order->services;
-            array_push($tmp, [
-                "service_ids" => $request->types,
-                "weight_class_id" => $request->weight,
-                "note" => $note
-            ]
-        );
-            $current_order->services = $tmp;
+            $all_services = $current_order->services;
+            foreach ($all_services as $key=>$service) {
+                if ($service['service_id'] == $service_to_remove->id) {
+                    unset($all_services[$key]);
+                }
+            }
+
+            if (empty($all_services)) {
+                $current_order->delete();
+                return response()->json([
+                    "status" => 1
+                ]);
+            }
+
+            $current_order->services = $all_services;
             $current_order->save();
             $current_order->calculatePrice();
+           
             return response()->json([
                 "status" => 1
             ]);
         }
-        else {
-            $order = Order::create([
-                'services' => [[
-                    "service_ids" => $request->types,
-                    "weight_class_id" => $request->weight,
-                    "note" => $note
-                ]],
-                'client_id' => Auth::id(),
-                'status' => OrderdStatus::ORDER_IN_CREATION,
-                'price' => 0
-            ]);
-            $order->calculatePrice();
-            return response()->json([
-                "status" => 1
-            ]);
-        }
+
         return response()->json(["status" => 0,"errorMessage" => "Error"]);
     }
 
     public function clientGetTotalNuberOfOrders () {
-        $orders_count = Order::where('client_id',Auth::id())->count();
+        $orders = Order::where('client_id',Auth::id())
+            ->where('status', '!=', OrderStatus::ORDER_IN_CREATION)->get();
+            //->where('status', '!=', OrderStatus::ORDER_CREATED)->get();
+
+        foreach ($orders as $key=>$order) {
+            $order_rating = OrderRating::where('order_id', $order->id)->first();
+            if (isset($order_rating)) {
+                unset($orders[$key]);
+            }
+        }
+        
         return response()->json([
             'status' => 1,
-            "orders" => $orders_count
+            "orders" => count($orders)
         ]);
     }
 
     public function clientGetOrderList () {
-        $orders = Order::where('client_id',Auth::id())->get();
+        $orders = Order::where('client_id',Auth::id())
+            ->where('status', '!=', OrderStatus::ORDER_IN_CREATION)->get();
+            //->where('status', '!=', OrderStatus::ORDER_CREATED)->get();
+        foreach ($orders as $key=>$order) {
+            $order_rating = OrderRating::where('order_id', $order->id)->first();
+            if (isset($order_rating)) {
+                unset($orders[$key]);
+            }
+        }
         $result = [];
         foreach ($orders as $order) {
-            //$time = $this->formatTime($this->calculateDistance(Auth::user()->location,Auth::user()->location));
-            $time = rand(10,40) . "min";
+            /*
+            $takeout_datetime = new \DateTime($order->takeout_date["date"] . " " . $order->takeout_date["end_time"]);
+            $now = new \DateTime();
+            $difference_in_seconds = $takeout_datetime->format('U') - $now->format('U');
+            $time = $this->formatTime($difference_in_seconds);
+            */
             $result[] = [
-                "jbp" => $order->id,
-                "time" =>$time,
-                "fractionFinished" => $order->status / 10
+                "jbp" => $order->id
             ]; 
         }
         return response()->json([
@@ -1061,7 +1697,18 @@ class OrderController extends Controller{
         $worker = User::where('id',$order->worker_id)->first();
 
         switch ($order->status) {
-            case OrderdStatus::ORDER_CREATED :
+            case OrderStatus::ORDER_CREATED :
+                // kreirano
+                return response()->json([
+                    'status' => 1,
+                    "orderStatus" => "kreirano",
+                    "loadDate" => $order->takeout_date["date"],
+                    "loadTime" => $order->takeout_date["end_time"],
+                    //"deliveryDate" =>  $order->delivery_date["date"],
+                    //"deliveryTime" => $order->delivery_date["end_time"]
+                ]);
+            break;
+            case OrderStatus::WORKER_ACCEPTED :
                 // kreirano
                 return response()->json([
                     'status' => 1,
@@ -1072,40 +1719,29 @@ class OrderController extends Controller{
                     "deliveryTime" => $order->delivery_date["end_time"]
                 ]);
             break;
-            case OrderdStatus::WORKER_ACCEPTED :
-                // kreirano
-                return response()->json([
-                    'status' => 1,
-                    "orderStatus" => "kreirano",
-                    "loadDate" => $order->takeout_date["date"],
-                    "loadTime" => $order->takeout_date["end_time"],
-                    "deliveryDate" =>  $order->delivery_date["date"],
-                    "deliveryTime" => $order->delivery_date["end_time"]
-                ]);
-            break;
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_CLIENT :
+            case OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT :
                 // preuzimanje
                 $driver = User::where('id',$order->driver_id)->first();
                 return response()->json([
                     'status' => 1,
                     "orderStatus" => "preuzimanje",
-                    "remainingTime" => googleAPIGetTimeRemainingFormated($driver->location, Auth::user()->location),
+                    "remainingTime" => googleAPIGetTimeRemainingFormated($driver->location, $order->order_info['location']),
                     "deliveryDate" =>  $order->delivery_date["date"],
                     "deliveryTime" => $order->delivery_date["end_time"]
                 ]);
             break;
-            case OrderdStatus::DRIVER_DELIVERY_TO_WORKER :
+            case OrderStatus::DRIVER_DELIVERY_TO_WORKER :
                 // preuzimanje
                 $driver = User::where('id',$order->driver_id)->first();
                 return response()->json([
                     'status' => 1,
-                    "orderStatus" => "preuzimanje",
-                    "remainingTime" => googleAPIGetTimeRemainingFormated($driver->location, $worker->location),
+                    "orderStatus" => "usluga",
+                    //"remainingTime" => googleAPIGetTimeRemainingFormated($driver->location, $worker->location),
                     "deliveryDate" =>  $order->delivery_date["date"],
                     "deliveryTime" => $order->delivery_date["end_time"]
                 ]);
             break;
-            case OrderdStatus::WORKER_PROCESSING :
+            case OrderStatus::WORKER_PROCESSING :
                 // usluga
                 return response()->json([
                     'status' => 1,
@@ -1114,7 +1750,7 @@ class OrderController extends Controller{
                     "deliveryTime" => $order->delivery_date["end_time"]
                 ]);
             break;
-            case OrderdStatus::WORKER_FINISHED :
+            case OrderStatus::WORKER_FINISHED :
                 // usluga
                 return response()->json([
                     'status' => 1,
@@ -1123,28 +1759,32 @@ class OrderController extends Controller{
                     "deliveryTime" => $order->delivery_date["end_time"]
                 ]);
             break;
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_WORKER :
+            case OrderStatus::DRIVER_TAKEOUT_FROM_WORKER :
                 // dostava
                 $driver = User::where('id',$order->driver_id)->first();
                 return response()->json([
                     'status' => 1,
                     "orderStatus" => "dostava",
-                    "remainingTime" => googleAPIGetTimeRemainingFormated($driver->location, $worker->location),
+                    "remainingTime" => $this->formatTime(
+                        googleAPIGetTimeRemainingInSeconds($driver->location, $worker->location) + 
+                        googleAPIGetTimeRemainingInSeconds($worker->location, $order->order_info['location'])
+                    ),
                 ]);
             break;
-            case OrderdStatus::DRIVER_DELIVERY_TO_CLIENT :
+            case OrderStatus::DRIVER_DELIVERY_TO_CLIENT :
                 // dostava
                 $driver = User::where('id',$order->driver_id)->first();
                 return response()->json([
                     'status' => 1,
                     "orderStatus" => "dostava",
-                    "remainingTime" => googleAPIGetTimeRemainingFormated($driver->location, Auth::user()->location),
+                    "remainingTime" => googleAPIGetTimeRemainingFormated($driver->location, $order->order_info['location']),
                 ]);
             break;
-            case OrderdStatus::ORDER_DELIVERED :
+            case OrderStatus::ORDER_DELIVERED :
                 // realizovano
                 return response()->json([
                     'status' => 1,
+                    'canRate' => OrderRating::where('order_id',$order->id)->where('user_id',Auth::user())->first() == null ? TRUE : FALSE,
                     "orderStatus" => "realizovano"
                 ]);
             break;
@@ -1171,17 +1811,17 @@ class OrderController extends Controller{
         $remaining_time = NULL;
 
         switch ($order->status) {
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_CLIENT :
-                $remaining_time = googleAPIGetTimeRemainingFormated($driver->location, Auth::user()->location);
+            case OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT :
+                $remaining_time = googleAPIGetTimeRemainingFormated($driver->location, $order->order_info['location']);
             break;
-            case OrderdStatus::DRIVER_DELIVERY_TO_WORKER :
+            case OrderStatus::DRIVER_DELIVERY_TO_WORKER :
                 $remaining_time = googleAPIGetTimeRemainingFormated($driver->location, $worker->location);
             break;
-            case OrderdStatus::DRIVER_TAKEOUT_FROM_WORKER :
+            case OrderStatus::DRIVER_TAKEOUT_FROM_WORKER :
                 $remaining_time = googleAPIGetTimeRemainingFormated($driver->location, $worker->location);
             break;
-            case OrderdStatus::DRIVER_DELIVERY_TO_CLIENT :
-                $remaining_time = googleAPIGetTimeRemainingFormated($driver->location, Auth::user()->location);
+            case OrderStatus::DRIVER_DELIVERY_TO_CLIENT :
+                $remaining_time = googleAPIGetTimeRemainingFormated($driver->location, $order->order_info['location']);
             break;
             default :
                 $remaining_time = "Nedostupno";
@@ -1218,25 +1858,11 @@ class OrderController extends Controller{
         $order = Order::where('id', $request->jbp)->first();
         if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Unavailable order']);
 
-        $result = [];
-        $full_price = 0;
-
-        foreach ($order->services as $service_group) {
-            foreach ($service_group["service_ids"] as $service_id) {
-                $service = Service::where('id',$service_id)->first();
-                $price = Price::where('service_id',$service_id)->where('weight_class_id',$service_group["weight_class_id"])->first();
-                $result[] = [
-                    "type" => $service->name,
-                    "price" => $price->value
-                ];
-                $full_price += $price->value;
-            }
-        }
-
+        $result = $order->servicesGroupFormated();
         return response()->json([
             'status' => 1,
-            "services" => $result,
-            "totalPrice" => $full_price
+            "services" => $result['services'],
+            "totalPrice" => $result['fullPrice']
         ]);
     }
 
@@ -1253,28 +1879,29 @@ class OrderController extends Controller{
     }
 
     public function clientGetCurrentPaymentInfo (Request $request) {
-        $order = Order::where('client_id', Auth::id())->where('status', OrderdStatus::ORDER_IN_CREATION)->first();
+        $order = Order::where('client_id', Auth::id())->where('status', OrderStatus::ORDER_IN_CREATION)->first();
 
-        if (!isset($order)) return response()->json(["status" => 'ERROR',"message" => 'No pending orders']);
+        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => 'No pending orders']);
 
-        $result = [];
-        $full_price = 0;
-
-        foreach ($order->services as $service_group) {
-            foreach ($service_group["service_ids"] as $service_id) {
-                $service = Service::where('id',$service_id)->first();
-                $price = Price::where('service_id',$service_id)->where('weight_class_id',$service_group["weight_class_id"])->first();
-                $result[] = [
-                    "type" => $service->name,
-                    "price" => $price->value
-                ];
-                $full_price += $price->value;
-            }
-        }
-
+        $result = $order->servicesGroupFormated();
+        
         return response()->json([
-            "services" => $result,
-            "totalPrice" => $full_price
+            //'status' => 1,
+            "services" => $result['services'],
+            "totalPrice" => $result['fullPrice']
+        ]);
+    }
+
+    public function clientGetTotalCartPrice (Request $request) {
+        $order = Order::where('client_id', Auth::id())->where('status', OrderStatus::ORDER_IN_CREATION)->first();
+
+        if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Unavailable order']);
+
+        $result = $order->servicesGroupFormated();
+        
+        return response()->json([
+            'status' => 1,
+            "totalPrice" => $result['fullPrice']
         ]);
     }
 
@@ -1286,18 +1913,16 @@ class OrderController extends Controller{
 
         $result = [];
 
-        foreach ($order->services as $service_group) {
-            foreach ($service_group["service_ids"] as $service_id) {
-                $is_new_service = TRUE;
-                $service = Service::where('id',$service_id)->first();
-                foreach ($result as $single) {
-                    if ($single['id'] == $service_id) {
-                        $is_new_service = FALSE;
-                    }
+        foreach ($order->services as $service) {
+            $is_new_service = TRUE;
+            $service_obj = Service::where('id',$service['service_id'])->first();
+            foreach ($result as $single) {
+                if ($single['id'] == $service_obj->id) {
+                    $is_new_service = FALSE;
                 }
-                if ($is_new_service) {
-                    $result[] = ["name" => $service->name, "id" => $service->id];
-                }
+            }
+            if ($is_new_service) {
+                $result[] = ["name" => $service_obj->name, "id" => $service_obj->id];
             }
         }
 
@@ -1319,6 +1944,7 @@ class OrderController extends Controller{
         if (isset($request->note)) {
             OrderRating::create([
                 'order_id' => $order->id,
+                'user_id' => Auth::id(),
                 'service_ratings' => $request->ratings,
                 'note' => $request->note
             ]);
@@ -1326,6 +1952,7 @@ class OrderController extends Controller{
         else {
             OrderRating::create([
                 'order_id' => $order->id,
+                'user_id' => Auth::id(),
                 'service_ratings' => $request->ratings
             ]);
         }
@@ -1334,6 +1961,66 @@ class OrderController extends Controller{
             "status" => 1
         ]);
 
+    }
+
+    public function clientOrderData (Request $request) {
+        $request->validate(['jbp' => 'required']);
+
+        $order = Order::where('id',$request->jbp)->first();
+        $worker = User::where('id',$order->worker_id)->first();
+        $driver = User::where('id',$order->driver_id)->first();
+
+        if (!isset($order)) return response()->json(['status' => 0, 'errorMessage' => 'Unavailable order']);
+        if (!isset($driver)) return response()->json(['status' => 0, 'errorMessage' => 'Unavailable driver']);
+        if (!isset($worker)) return response()->json(['status' => 0, 'errorMessage' => 'Unavailable worker']);
+
+        $remaining_time = NULL;
+        $fractal_distance = 0.5;
+
+        switch ($order->status) {
+            case OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT :
+                $remaining_time = googleAPIGetTimeRemainingFormated($driver->location, $order->order_info['location']);
+            break;
+            case OrderStatus::DRIVER_DELIVERY_TO_WORKER :
+                //$remaining_time = googleAPIGetTimeRemainingFormated($driver->location, $worker->location);
+                $remaining_time = "Nedostupno";
+            break;
+            case OrderStatus::DRIVER_TAKEOUT_FROM_WORKER :
+                //$remaining_time = googleAPIGetTimeRemainingFormated($driver->location, $worker->location);
+                $remaining_time = $this->formatTime(
+                    googleAPIGetTimeRemainingInSeconds($driver->location, $worker->location) + 
+                    googleAPIGetTimeRemainingInSeconds($worker->location, $order->order_info['location'])
+                );
+            break;
+            case OrderStatus::DRIVER_DELIVERY_TO_CLIENT :
+                $remaining_time = googleAPIGetTimeRemainingFormated($driver->location, $order->order_info['location']);
+            break;
+            default :
+                $remaining_time = "Nedostupno";
+            break;
+        }
+        return response()->json([
+            'status' => 1,
+            "remainingTime" => $remaining_time,
+            "driverName" => $driver->name . " " . $driver->surname,
+            "driverPhone" => $driver->phone,
+            "licencePlate" => $driver->profile->licence_plate,
+            "fractal" => $fractal_distance,
+            "driverLatitude" => $driver->location["latitude"],
+            "driverLongitude" => $driver->location["longitude"],
+            "clientLatitude" => $order->order_info['location']['latitude'],
+            "clientLongitude" => $order->order_info['location']['longitude'],
+
+        ]);
+    }
+
+    public function clientEmptyCart () {
+        $order = Order::where('client_id', Auth::id())->where('status',OrderStatus::ORDER_IN_CREATION)->first();
+
+        if (!isset($order)) return response()->json(['status' => 0, 'errorMessage' => 'Cart already empty']);
+
+        $order->delete();
+        return response()->json(['status' => 1]);
     }
 
 
@@ -1388,7 +2075,7 @@ class OrderController extends Controller{
 
     public function workerGetPendingOrders() {
         $rejected_orders = RejectedOrders::where('worker_id',Auth::id())->get();
-        $pending_orders = Order::where('status', '=', OrderdStatus::ORDER_CREATED)->get();
+        $pending_orders = Order::where('status', '=', OrderStatus::ORDER_CREATED)->get();
 
         foreach ($rejected_orders as $rejected_order) {
             $r_order_id = $rejected_order->order_id;
@@ -1408,8 +2095,8 @@ class OrderController extends Controller{
             'order_id' => 'required'
         ]);
         $order = Order::where('id',$request->order_id)->first();
-        if (isset($order) && $order->status == OrderdStatus::ORDER_CREATED) {
-            $order->status = OrderdStatus::WORKER_ACCEPTED;
+        if (isset($order) && $order->status == OrderStatus::ORDER_CREATED) {
+            $order->status = OrderStatus::WORKER_ACCEPTED;
             $order->worker_id = Auth::id();
             $order->save();
             return response()->json([
@@ -1431,7 +2118,7 @@ class OrderController extends Controller{
         ]);
 
         $order = Order::where('id',$request->order_id)->first();
-        if (isset($order) && $order->status == OrderdStatus::ORDER_CREATED) {
+        if (isset($order) && $order->status == OrderStatus::ORDER_CREATED) {
             $rejected_order = RejectedOrders::where('order_id',$order->id)->where('worker_id', Auth::id())->first();
             if (isset($rejected_order)) {
                 return response()->json([
@@ -1453,7 +2140,7 @@ class OrderController extends Controller{
     }
 
     public function workerOrderReady (Request $request, $id) {
-        Order::where('id',$id)->update(['status' => OrderdStatus::WORKER_FINISHED]);
+        Order::where('id',$id)->update(['status' => OrderStatus::WORKER_FINISHED]);
         return response()->json([
             "status" => "Success",
             "message" => "Order Ready"
@@ -1462,7 +2149,7 @@ class OrderController extends Controller{
 
     // DRIVER
     public function driverGetPendingOrders() {
-        return Order::whereIn('status',[OrderdStatus::WORKER_ACCEPTED, OrderdStatus::WORKER_FINISHED])->get();
+        return Order::whereIn('status',[OrderStatus::WORKER_ACCEPTED, OrderStatus::WORKER_FINISHED])->get();
     }
 
     public function driverGetCurrentOrders() {
@@ -1481,11 +2168,11 @@ class OrderController extends Controller{
             ]);
         }
 
-        if ($order->status == OrderdStatus::DRIVER_TAKEOUT_FROM_CLIENT) {
-            $order->status = OrderdStatus::DRIVER_DELIVERY_TO_WORKER;
+        if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT) {
+            $order->status = OrderStatus::DRIVER_DELIVERY_TO_WORKER;
         }
-        else if ($order->status == OrderdStatus::DRIVER_TAKEOUT_FROM_WORKER) {
-            $order->status = OrderdStatus::DRIVER_DELIVERY_TO_CLIENT;
+        else if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_WORKER) {
+            $order->status = OrderStatus::DRIVER_DELIVERY_TO_CLIENT;
         }
         $order->save();
         return response()->json([
@@ -1506,11 +2193,11 @@ class OrderController extends Controller{
             ]);
         }
 
-        if ($order->status == OrderdStatus::DRIVER_DELIVERY_TO_WORKER) {
-            $order->status = OrderdStatus::WORKER_PROCESSING;
+        if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER) {
+            $order->status = OrderStatus::WORKER_PROCESSING;
         }
-        else if ($order->status == OrderdStatus::DRIVER_DELIVERY_TO_CLIENT) {
-            $order->status = OrderdStatus::ORDER_DELIVERED;
+        else if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_CLIENT) {
+            $order->status = OrderStatus::ORDER_DELIVERED;
         }
         $order->save();
         return response()->json([
@@ -1565,5 +2252,14 @@ class OrderController extends Controller{
         return Service::getPrices($request->services);
 
 
+    }
+
+    public function test(Request $request) {
+        if($request->hasFile('image')){
+            $filename = $request->image->getClientOriginalName();
+            $request->image->storeAs('images/profile','1-' . $filename,'public');
+            //Auth()->user()->update(['image'=>$filename]);
+            return asset('storage/images/profile/1-' . $filename);
+        }
     }
 }

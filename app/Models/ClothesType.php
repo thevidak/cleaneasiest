@@ -5,14 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Options extends Model
+class ClothesType extends Model
 {
     use HasFactory;
 
-    public $fillable = ['value'];
+    protected $hidden = ['created_at', 'updated_at'];
 
-    protected $casts = [
-        'value' => 'array'
-    ];
-
+    protected $fillable = ['name'];
 }

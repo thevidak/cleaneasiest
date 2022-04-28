@@ -18,8 +18,13 @@ use App\Orchid\Screens\User\UserProfileScreen;
 use Illuminate\Support\Facades\Route;
 use Tabuna\Breadcrumbs\Trail;
 
-use App\Orchid\Screens\OrderEditScreen;
-use App\Orchid\Screens\OrderListScreen;
+
+use App\Orchid\Screens\Order\OrderNewListScreen;
+use App\Orchid\Screens\Order\OrderStalledListScreen;
+use App\Orchid\Screens\Order\OrderFinishedListScreen;
+use App\Orchid\Screens\Order\OrderListScreen;
+use App\Orchid\Screens\Order\OrderShowScreen;
+use App\Orchid\Screens\Order\OrderEditScreen;
 
 use App\Orchid\Screens\DriverListScreen;
 use App\Orchid\Screens\DriverEditScreen;
@@ -29,6 +34,12 @@ use App\Orchid\Screens\WorkerEditScreen;
 
 use App\Orchid\Screens\ClientListScreen;
 use App\Orchid\Screens\ClientEditScreen;
+
+use App\Orchid\Screens\ServiceListScreen;
+use App\Orchid\Screens\ServiceEditScreen;
+
+use App\Orchid\Screens\WeightClass\WeightClassListScreen;
+use App\Orchid\Screens\Options\RejectReasonListScreen;
 
 
 /*
@@ -43,7 +54,7 @@ use App\Orchid\Screens\ClientEditScreen;
 */
 
 // Main
-Route::screen('/main', OrderListScreen::class)->name('platform.main');
+Route::screen('/main', OrderNewListScreen::class)->name('platform.main');
 
 // Platform > Profile
 Route::screen('profile', UserProfileScreen::class)
@@ -124,9 +135,12 @@ Route::screen('example-editors', ExampleTextEditorsScreen::class)->name('platfor
 Route::screen('example-cards', ExampleCardsScreen::class)->name('platform.example.cards');
 Route::screen('example-advanced', ExampleFieldsAdvancedScreen::class)->name('platform.example.advanced');
 
-
-Route::screen('order/{order?}', OrderEditScreen::class)->name('order.edit');
 Route::screen('orders', OrderListScreen::class)->name('order.list');
+Route::screen('orders-new', OrderNewListScreen::class)->name('order.newlist');
+Route::screen('orders-finished', OrderFinishedListScreen::class)->name('order.finishedlist');
+Route::screen('orders-stalled', OrderStalledListScreen::class)->name('order.stalledlist');
+Route::screen('order/{order}', OrderShowScreen::class)->name('order.show');
+Route::screen('order/edit/{order?}', OrderEditScreen::class)->name('order.edit');
 
 Route::screen('driver/{driver?}', DriverEditScreen::class)->name('driver.edit');
 Route::screen('drivers', DriverListScreen::class)->name('driver.list');
@@ -136,5 +150,12 @@ Route::screen('workers', WorkerListScreen::class)->name('worker.list');
 
 Route::screen('client/{client?}', ClientEditScreen::class)->name('client.edit');
 Route::screen('clients', ClientListScreen::class)->name('client.list');
+
+Route::screen('services', ServiceListScreen::class)->name('service.list');
+Route::screen('service/{service?}', ServiceEditScreen::class)->name('service.edit');
+
+Route::screen('weights', WeightClassListScreen::class)->name('weight.list');
+
+Route::screen('reasons', RejectReasonListScreen::class)->name('reason.list');
 
 

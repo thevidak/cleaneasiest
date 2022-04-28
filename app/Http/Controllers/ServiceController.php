@@ -60,4 +60,23 @@ class ServiceController extends Controller
         $shop = Shop::where('user_id',Auth::id())->first();
         return Service::where('shop_id',$shop->id)->get();
     }
+
+    public function clientGetAllServiceTypes() {
+        $services = Service::all();
+
+        $service_output = [];
+
+        foreach ($services as $service) {
+            $service_output[] = [
+                'id' => $service->id,
+                'name' => $service->name,
+                'type' => $service->type == 0 ? 'weightable' : 'countable'
+            ];
+        }
+
+        return response()->json([
+            "status" => 1,
+            "result" => $service_output
+        ]);
+    }
 }

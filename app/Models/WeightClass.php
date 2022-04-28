@@ -8,4 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 class WeightClass extends Model
 {
     use HasFactory;
+
+    public $timestamps = false;
+
+    protected $fillable = ['id', 'name'];
 }
