@@ -61,6 +61,15 @@ class ServiceController extends Controller
         return Service::where('shop_id',$shop->id)->get();
     }
 
+    public function clientGetServicePrices(Request $request) {
+        $request->validate(['service_id' => 'required']);
+
+        return response()->json([
+            'status' => 1,
+            'result' => Service::getPrices($request->service_id)
+        ]);
+    }
+
     public function clientGetAllServiceTypes() {
         $services = Service::all();
 

@@ -57,7 +57,7 @@ class Order extends Model
         'updated_at'
     ];
 
-    // calculate price for the existing order, using info from the services field
+    // calculate price for the existing order, using info from the services field and saves it
     public function calculatePrice() {
         $services = $this->services;
         $price = 0;
@@ -80,6 +80,34 @@ class Order extends Model
         $this->price = $price;
         $this->save();
         return $price;
+    }
+
+    // returns formated dates (takout or delivery) from orders
+    // arguments: type : takout/delivery, flag : start/end 
+    // return DateTime object
+    public function getDateTime($type, $flag) {
+        if ($type == 'takeout') {
+            if ($flag == 'start') {
+                //$datetime = new \DateTime($this->takeout_date["date"] . " " . $this->takeout_date["start_time"]);
+                $datetime = \DateTime::createFromFormat('d-m-Y H:i', $this->takeout_date["date"] . " " . $this->takeout_date["start_time"]);
+            }
+            else if ($flag == 'end') {
+                //$datetime =  new \DateTime($this->takeout_date["date"] . " " . $this->takeout_date["end_time"]);
+                $datetime = \DateTime::createFromFormat('d-m-Y H:i', $this->takeout_date["date"] . " " . $this->takeout_date["end_time"]);
+            }
+        }
+        else if ($type == 'delivery') {
+            if ($flag == 'start') {
+                //$datetime =  new \DateTime($this->delivery_date["date"] . " " . $this->delivery_date["start_time"]);
+                $datetime = \DateTime::createFromFormat('d-m-Y H:i', $this->delivery_date["date"] . " " . $this->takeout_date["start_time"]);
+            }
+            else if ($flag == 'end') {
+                //$datetime =  new \DateTime($this->delivery_date["date"] . " " . $this->delivery_date["end_time"]);
+                $datetime = \DateTime::createFromFormat('d-m-Y H:i', $this->delivery_date["date"] . " " . $this->takeout_date["end_time"]);
+            }
+        }
+
+        return $datetime;
     }
 
     /*********************************************************************************************************************************************************
@@ -154,26 +182,8 @@ class Order extends Model
         return $locations;
     }
 
-    public function getDateTime($type, $flag) {
-        if ($type == 'takeout') {
-            if ($flag == 'start') {
-                $datetime = new \DateTime($this->takeout_date["date"] . " " . $this->takeout_date["start_time"]);
-            }
-            else if ($flag == 'end') {
-                $datetime =  new \DateTime($this->takeout_date["date"] . " " . $this->takeout_date["end_time"]);
-            }
-        }
-        else if ($type == 'delivery') {
-            if ($flag == 'start') {
-                $datetime =  new \DateTime($this->delivery_date["date"] . " " . $this->delivery_date["start_time"]);
-            }
-            else if ($flag == 'end') {
-                $datetime =  new \DateTime($this->delivery_date["date"] . " " . $this->delivery_date["end_time"]);
-            }
-        }
 
-        return $datetime;
-    }
+
 /*
     public function client() {
         return $this->hasMany(User::class, 'id', 'client_id');

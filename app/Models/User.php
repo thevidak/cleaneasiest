@@ -65,6 +65,14 @@ class User extends Authenticatable implements MustVerifyEmail {
         return $this->hasMany(LinkedSocialAccount::class);
     }
 
+    public function addresses() {
+        return $this->hasMany(Address::class);
+    }
+
+    public function cards() {
+        return $this->hasMany(CreditCard::class);
+    }
+
     public function profile() {
         return $this->hasOne(UserProfile::class);
     }
@@ -80,5 +88,26 @@ class User extends Authenticatable implements MustVerifyEmail {
     public function getFullNameAttribute () {
         return $this->name . " " . $this->surname; 
     }
+
+    // Attributes
+    public function getActiveAddressAttribute () {
+        foreach ($this->addresses as $address) {
+            if ($address->active) {
+                return $address;
+            }
+        }
+        return NULL;
+    }
+    public function getActiveCardAttribute () {
+        foreach ($this->cards as $card) {
+            if ($card->active) {
+                return $card;
+            }
+        }
+        return NULL;
+    }
+
+
+
 
 }

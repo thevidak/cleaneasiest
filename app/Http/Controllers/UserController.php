@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Role;
 use App\Models\Shop;
 use App\Models\LinkedSocialAccount;
+use App\Models\ClientInfo;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -12,12 +13,19 @@ use Illuminate\Support\Facades\Hash;
 
 use App\Models\User;
 use App\Models\WorkerProfile;
+use App\Models\Address;
+use App\Models\ClientQuestion;
+use App\Models\CreditCard;
+use App\Models\Options;
+
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password;
 
 use Illuminate\Auth\Events\Registered;
 
 use Laravel\Socialite\Facades\Socialite;
+
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
@@ -300,7 +308,36 @@ class UserController extends Controller
     }
 
     public function info(Request $request) {
-        return Auth::user();
+        $user = Auth::user();
+        $user_info = ClientInfo::where('client_id', $user->id)->first();
+
+        if (!isset($user_info)) {
+            $user_info = ClientInfo::create([
+                'client_id' => $user->id
+            ]);
+        }
+
+        $client_info = [
+            "id"=> $user->id,
+            "name"=> $user->name,
+            "surname" => $user->surname,
+            //"address" => $user->address,
+            //"city" => $user->city,
+            //"municipality" => $user->municipality,
+            //"country" => $user->country,
+            //"zip" => $user->zip,
+            "phone" => $user->phone,
+            "email" => $user->email,
+            //"location" => $user->location,
+            "profile_image" => $user->profile_image,
+            //"card_id" => $user_info->card_id,
+            "active_address" => $user->activeAddress,
+            "active_card" => $user->activeCard
+
+        ];
+
+
+        return $client_info;
     }
 
     public function logout(Request $request) {
@@ -427,24 +464,319 @@ class UserController extends Controller
         return response()->json([            'status' => 1,        ], 200);
     }
 
+    /*************************************************************************************************************************************/
+    // ADDRESSESS
+    /*************************************************************************************************************************************/
+    public function clientGetAddressList() {
+        $addresses = Auth::user()->addresses;
+        if (count($addresses)==0) return response()->json(['status' => 0,'message' => 'Nema adresa']);
+
+        return response()->json([
+            'status' => 1,
+            'addresses' => $addresses
+        ]);
+    }
+
+    public function clientGetActiveAddress() {
+        $active_address = Auth::user()->activeAddress;
+        if (!isset($active_address)) return response()->json(['status' => 0,'message' => 'Nema aktivne adrese']);
+
+        return response()->json([
+            'status' => 1,
+            'address' => $active_address
+        ]);
+    }
+
+    public function clientAddAddress(Request $request) {
+        $user = Auth::user();
+        $request->validate([
+            'address_text' => 'required',
+            'latitude' => 'required',
+            'longitude' => 'required'
+        ]);
+
+        $note = isset($request['note']) ? $request['note'] : NULL;
+
+        if (isset($request['active']) && $request['active'] == TRUE) {
+            $active_address = $user->activeAddress;
+            if (isset($active_address)) {
+                $active_address->active = FALSE;
+                $active_address->save();
+            }
+
+            Address::create([
+                'user_id' => Auth::id(),
+                'text' => $request['address_text'],
+                'latitude' => $request['latitude'],
+                'longitude' => $request['longitude'],
+                'note' => $note,
+                'active' => TRUE
+            ]);
+
+            return response()->json(['status' => 1]);
+        }
+        else {
+            Address::create([
+                'user_id' => Auth::id(),
+                'text' => $request['address_text'],
+                'latitude' => $request['latitude'],
+                'longitude' => $request['longitude'],
+                'note' => $note,
+            ]);
+
+            return response()->json(['status' => 1]);
+        }
+
+
+        return response()->json(['status' => 0,'message' => 'Doslo je do greske']);
+
+    }
+
+    
+
+    public function clientSetActiveAddress(Request $request) {
+        $request->validate([
+            'address_id' => 'required',
+        ]);
+
+        $user = Auth::user();
+
+        $current_address = Address::where('id', $request['address_id'])->where('user_id', $user->id)->first();
+        if (!isset($current_address)) return response()->json(['status' => 0,'message' => 'Los ID']); 
+
+        $active_address = $user->activeAddress;
+        if (isset($active_address)) {
+            $active_address->active = FALSE;
+            $active_address->save();
+        }
+
+        $current_address->active = TRUE;
+        $current_address->save();
+
+        return response()->json(['status' => 1]);
+    }
+
+    public function clientEditAddress(Request $request) {
+        $request->validate([
+            'address_id' => 'required',
+        ]);
+
+        $user = Auth::user();
+
+        $current_address = Address::where('id', $request['address_id'])->where('user_id', $user->id)->first();
+        if (!isset($current_address)) return response()->json(['status' => 0,'message' => 'Los ID']); 
+
+        if (isset($request['address_text'])) $current_address->text = $request['address_text'];
+        if (isset($request['latitude'])) $current_address->latitude = $request['latitude'];
+        if (isset($request['longitude'])) $current_address->longitude = $request['longitude'];
+        if (isset($request['note'])) $current_address->note = $request['note'];
+
+        $current_address->save();
+        
+        return response()->json(['status' => 1]);
+    }
+
+    public function clientDeleteAddress(Request $request) {
+        $request->validate([
+            'address_id' => 'required',
+        ]);
+
+        $user = Auth::user();
+
+        $current_address = Address::where('id', $request['address_id'])->where('user_id', $user->id)->first();
+        if (!isset($current_address)) return response()->json(['status' => 0,'message' => 'Los ID']); 
+
+        if($current_address->active == TRUE) {
+
+        }
+        else {
+            
+        }
+
+        $current_address->delete();
+        return response()->json(['status' => 1]);
+    }
+
+    /*************************************************************************************************************************************/
+    // CARDS
+    /*************************************************************************************************************************************/
+    public function clientGetCardList() {
+        $cards = Auth::user()->cards;
+        if (count($cards)==0) return response()->json(['status' => 0,'message' => 'Nema kartica']);
+
+        return response()->json([
+            'status' => 1,
+            'cards' => $cards
+        ]);
+    }
+
+    public function clientGetActiveCard() {
+        $active_card = Auth::user()->activeCard;
+        if (!isset($active_card)) return response()->json(['status' => 0,'message' => 'Nema aktivne kartice']);
+
+        return response()->json([
+            'status' => 1,
+            'card' => $active_card
+        ]);
+    }
+
+    public function clientAddCard(Request $request) {
+        $user = Auth::user();
+        $request->validate([
+            'card_number' => 'required'
+        ]);
+
+        if (isset($request['active']) && $request['active'] == TRUE) {
+            $active_card = $user->activeCard;
+            if (isset($active_card)) {
+                $active_card->active = FALSE;
+                $active_card->save();
+            }
+
+            CreditCard::create([
+                'user_id' => Auth::id(),
+                'number' => $request['card_number'],
+                'active' => TRUE
+            ]);
+
+            return response()->json(['status' => 1]);
+        }
+        else {
+            CreditCard::create([
+                'user_id' => Auth::id(),
+                'number' => $request['card_number']
+            ]);
+
+            return response()->json(['status' => 1]);
+        }
+
+
+        return response()->json(['status' => 0,'message' => 'Doslo je do greske']);
+
+    }
+
+    
+
+    public function clientSetActiveCard(Request $request) {
+        $request->validate([
+            'card_id' => 'required',
+        ]);
+
+        $user = Auth::user();
+
+        $current_card = CreditCard::where('id', $request['card_id'])->where('user_id', $user->id)->first();
+        if (!isset($current_card)) return response()->json(['status' => 0,'message' => 'Los ID']); 
+
+        $active_card = $user->activeCard;
+        if (isset($active_card)) {
+            $active_card->active = FALSE;
+            $active_card->save();
+        }
+
+        $current_card->active = TRUE;
+        $current_card->save();
+
+        return response()->json(['status' => 1]);
+    }
+
+    public function clientDeleteCard(Request $request) {
+        $request->validate([
+            'card_id' => 'required',
+        ]);
+
+        $user = Auth::user();
+
+        $current_card = CreditCard::where('id', $request['card_id'])->where('user_id', $user->id)->first();
+        if (!isset($current_card)) return response()->json(['status' => 0,'message' => 'Los ID']); 
+
+        if($current_card->active == TRUE) {
+
+        }
+        else {
+            
+        }
+
+        $current_card->delete();
+        return response()->json(['status' => 1]);
+    }
+
+    
+    public function clientGetSupportText() {
+        $option = Options::where('name','SUPPORT_TEXT')->first();
+        if (!isset($option)) return response()->json(['status' => 0,'message' => 'Greska u bazi']);
+        return response()->json([
+            'title' => $option->value['title'],
+            'text' => $option->value['text']
+        ]);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
     public function testUpload(Request $request) {
-        if($request->hasFile('image')){
-            $tmp = explode(".", $request->image->getClientOriginalName());
-            $filename = 'test' . '.' . end($tmp);
-            $request->image->storeAs('images/test', $filename,'public');
+        Log::debug($request);
+
+        if (!isset($request['image'])) {
+            return response()->json(['status' => 0, 'errorMessage' => 'Slika nije poslata']);
+        }
+
+        try {
+            $image_64 = $request['image']; 
+            $extension = explode('/', explode(':', substr($image_64, 0, strpos($image_64, ';')))[1])[1]; 
+            $replace = substr($image_64, 0, strpos($image_64, ',')+1); 
+        
+            $image = str_replace($replace, '', $image_64); 
+            $image = str_replace(' ', '+', $image); 
+        
+            $imageName = \Str::random(10).'.'.$extension;
+        
+            \Storage::disk('public')->put('images/test/' . $imageName, base64_decode($image));
 
             return response()->json([
                 'status' => 1,
-                'image' => asset('storage/images/test/' . $filename)
+                'image' => asset('storage/images/test/' . $imageName)
+            ]);
+
+        }
+        catch (Exception $e) {
+            return $e;
+        }
+
+        
+
+        /*
+        if($request->hasFile('image')){
+            $tmp = explode(".", $request->image->getClientOriginalName());
+            $filename = 'test' . '.' . end($tmp);
+            $request->image->storeAs('images/test', $request->image->getClientOriginalName(),'public');
+
+            ob_end_clean();
+            return response()->json([
+                'status' => 1,
+                'image' => asset('storage/images/test/' . $request->image->getClientOriginalName())
             ]);
 
         }
         else {
             return response()->json(['status' => 0, 'errorMessage' => 'Slika nije poslata']);
         }
+        */
 
         return response()->json(['status' => 0, 'errorMessage' => 'Nesto nije u redu. Kontaktirati Vidaka']);
         

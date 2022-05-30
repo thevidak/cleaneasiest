@@ -40,7 +40,6 @@ class ServiceListScreen extends Screen {
 
     public function remove(Service $service) {
         $service->delete();
-
         Toast::info(__('Servis je obrisan'));
         return redirect()->route('service.list');
     }

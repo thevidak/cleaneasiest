@@ -63,18 +63,23 @@ class PlatformProvider extends OrchidServiceProvider
 
 
             Menu::make(__('Servisi'))
-            ->icon('user')
+            ->icon('book-open')
             ->route('service.list')
             ->permission('platform.systems.users')
-            ->title('Podesavanja'),
+            ->title('Podešavanja'),
 
             Menu::make(__('Tezine'))
-            ->icon('user')
+            ->icon('basket-loaded')
             ->route('weight.list')
             ->permission('platform.systems.users'),
 
+            Menu::make(__('Tipovi Odece'))
+            ->icon('handbag')
+            ->route('clothes.list')
+            ->permission('platform.systems.users'),
+
             Menu::make(__('Razlozi odbijanja'))
-            ->icon('user')
+            ->icon('close')
             ->route('reason.list')
             ->permission('platform.systems.users'),
           

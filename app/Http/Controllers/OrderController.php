@@ -14,6 +14,10 @@ use App\Models\WeightClass;
 use App\Models\OrderRating;
 use App\Models\Options;
 use App\Models\StatusChange;
+use App\Models\Faq;
+use App\Models\Privacy;
+use App\Models\ClientQuestion;
+use App\Models\ClientInfo;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -103,6 +107,26 @@ class OrderController extends Controller{
 
         if (isset($current_order)) {
             $current_order->payment_info = $request->payment_info;
+            // if card payment
+            if ($request->payment_info['type'] == 1) {
+                if (isset($request->payment_info['card_id'])) {
+                   
+                    $user_info = ClientInfo::where('client_id', Auth::id())->first();
+
+                    if (!isset($user_info)) {
+                        $user_info = ClientInfo::create([
+                            'client_id' => $user->id,
+                            'card_id' => $request->payment_info['card_id']
+                        ]);
+                    }
+                    else {
+                        $user_info->card_id = $request->payment_info['card_id'];
+                        $user_info->save();
+                    }
+                }
+            }
+
+
             $current_order->takeout_date = $request->takeout_date;
             if (isset($request->order_info)) {
                 $order_info = $request->order_info;
@@ -188,7 +212,8 @@ class OrderController extends Controller{
         
         $result = [];
         foreach ($pending_orders as $order) {
-            $takeout_datetime = new \DateTime($order->takeout_date["date"] . " " . $order->takeout_date["end_time"]);
+            $takeout_datetime = $order->getDateTime('takeout', 'end');
+            //$takeout_datetime = new \DateTime($order->takeout_date["date"] . " " . $order->takeout_date["end_time"]);
             $now = new \DateTime();
 
             $difference_in_seconds = $takeout_datetime>$now ? $takeout_datetime->format('U') - $now->format('U') : 0;
@@ -230,7 +255,8 @@ class OrderController extends Controller{
         
         $result = [];
         foreach ($pending_orders as $order) {
-            $takeout_datetime = new \DateTime($order->takeout_date["date"] . " " . $order->takeout_date["end_time"]);
+            $takeout_datetime = $order->getDateTime('takeout', 'end');
+            //$takeout_datetime = new \DateTime($order->takeout_date["date"] . " " . $order->takeout_date["end_time"]);
             $now = new \DateTime();
 
             $difference_in_seconds = $takeout_datetime>$now ? $takeout_datetime->format('U') - $now->format('U') : 0;
@@ -336,7 +362,8 @@ class OrderController extends Controller{
         $result = [];
         
         foreach ($new_orders as $order) {
-            $takeout_datetime = new \DateTime($order->delivery_date["date"] . " " . $order->delivery_date["end_time"]);
+            $takeout_datetime = $order->getDateTime('delivery', 'end');
+            //$takeout_datetime = new \DateTime($order->delivery_date["date"] . " " . $order->delivery_date["end_time"]);
             $now = new \DateTime();
 
             $difference_in_seconds = $takeout_datetime>$now ? $this->formatTime(($takeout_datetime->format('U') - $now->format('U'))) : 'Isteklo';
@@ -898,6 +925,7 @@ class OrderController extends Controller{
 
         foreach ($pending_orders as $order) {
             $takeout_end_datetime = $order->getDateTime('takeout', 'start');
+            //dd($takeout_end_datetime);
 
             $result[] = [
                 'jbp' => $order->id,
@@ -1539,6 +1567,7 @@ class OrderController extends Controller{
 
         // For weightable services
         if ($service_type == ServiceType::WEIGHTABLE) {
+            if (!isset($request->weight_class_id)) return response()->json(["status" => 0,"errorMessage" => "Polje weight_class_id ne postoji"]);
             if (isset($current_order)) {
                 $tmp = $current_order->services;
                 array_push($tmp, [
@@ -1572,6 +1601,7 @@ class OrderController extends Controller{
         
         // For countable services
         else {
+            if (!isset($request->clothes)) return response()->json(["status" => 0,"errorMessage" => "Polje clothes ne postoji"]);
             if (isset($current_order)) {
                 $tmp = $current_order->services;
                 array_push($tmp, [
@@ -2022,6 +2052,49 @@ class OrderController extends Controller{
         $order->delete();
         return response()->json(['status' => 1]);
     }
+
+    public function clientGetPrivacy () {
+        $privacy = Privacy::where('name','Default')->first();
+
+        if (!isset($privacy)) return response()->json(["status" => 0, 'errorMessage' => 'Nema informacija na serveru']);
+
+        return response()->json([
+            "status" => 1,
+            "privacy" => $privacy->text
+        ]);
+    }
+
+    public function clientGetFaqs () {
+        $faqs = Faq::all();
+
+        if (!isset($faqs)) return response()->json(["status" => 0, 'errorMessage' => 'Nema informacija na serveru']);
+
+        return response()->json([
+            "status" => 1,
+            "faq" => $faqs
+        ]);
+    }
+
+
+    public function clientGetOrderHistory () {
+        $completed_orders = Order::where('client_id', Auth::id())->where('status', OrderStatus::ORDER_DELIVERED)->get();
+        $orders = [];
+
+        foreach ($completed_orders as $completed_order) {
+            if ($completed_order->status == OrderStatus::ORDER_DELIVERED) {
+                $orders[] = [
+                    "id" => $completed_order->id,
+                    "status" => "Realizovano"
+                ];
+            }
+        }
+
+        return response()->json([
+            "status" => 1,
+            "orders" => $orders
+        ]);
+    }
+
 
 
 

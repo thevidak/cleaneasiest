@@ -42,7 +42,6 @@ class Service extends Model
         }
 
         else if ($service->type == ServiceType::COUNTABLE) {
-
             $clothes = ClothesType::all();
             foreach ($clothes as $piece) {
                 $prices[] = [
@@ -73,6 +72,40 @@ class Service extends Model
         }
 
         return $price;
+    }
+
+    public static function boot() {
+        parent::boot();
+
+        self::deleting(function($service) {
+            $prices = Price::where('service_id', $service->id)->get();
+             foreach ($prices as $price) {
+                $price->delete();
+            }
+            
+        });
+        self::created(function($service) {
+            if ($service->type == ServiceType::WEIGHTABLE){
+                $weights = WeightClass::all();
+                foreach ($weights as $weight) {
+                    Price::create([
+                        'service_id' => $service->id,
+                        'weight_class_id' => $weight->id,
+                        'value' => 500 	
+                    ]);
+                }
+            }
+            else if ($service->type == ServiceType::COUNTABLE){
+                $clothes = ClothesType::all();
+                foreach ($clothes as $single_clothes) {
+                    Price::create([
+                        'service_id' => $service->id,
+                        'weight_class_id' => $single_clothes->id,
+                        'value' => 500 	
+                    ]);
+                }
+            }
+        });
     }
 
 }

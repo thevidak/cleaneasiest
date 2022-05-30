@@ -84,7 +84,7 @@ class DatabaseSeeder extends Seeder
             ['service_id' => 3, 'weight_class_id' => 2, 'value' => 250],
             ['service_id' => 3, 'weight_class_id' => 3, 'value' => 500],
             ['service_id' => 3, 'weight_class_id' => 4, 'value' => 1000],
-            // Susenje
+            // Premium pranje
             ['service_id' => 4, 'weight_class_id' => 1, 'value' => 150],
             ['service_id' => 4, 'weight_class_id' => 2, 'value' => 250],
             ['service_id' => 4, 'weight_class_id' => 3, 'value' => 500],
@@ -272,6 +272,32 @@ class DatabaseSeeder extends Seeder
                 'worker_id' => 2,
                 'driver_id' => 3,
             ],
+        ]);
+
+        DB::table('faqs')->insert([
+            [
+                'question' => 'Prvo Pitanje',
+                'answer' => 'Donec tincidunt pellentesque diam quis finibus. Sed ex mi, porttitor in nisi eu, dignissim volutpat lectus. Nam a nisl elementum nisl aliquam fermentum scelerisque et nisi. Cras vel ullamcorper diam, ut semper eros. Curabitur eu fermentum nunc, feugiat finibus arcu. Aenean sit amet odio ligula. Maecenas eu sem at mi lobortis semper. Donec tellus diam, pulvinar sit amet nunc non, feugiat imperdiet nunc. Nullam malesuada tincidunt enim a efficitur. Cras sollicitudin vitae neque ac viverra. Nunc nisi ante, vulputate sed interdum sit amet, porttitor at lectus. '
+            ],
+            [
+                'question' => 'Drugo Pitanje',
+                'answer' => 'Donec tincidunt pellentesque diam quis finibus. Sed ex mi, porttitor in nisi eu, dignissim volutpat lectus. Nam a nisl elementum nisl aliquam fermentum scelerisque et nisi. Cras vel ullamcorper diam, ut semper eros. Curabitur eu fermentum nunc, feugiat finibus arcu. Aenean sit amet odio ligula. Maecenas eu sem at mi lobortis semper. Donec tellus diam, pulvinar sit amet nunc non, feugiat imperdiet nunc. Nullam malesuada tincidunt enim a efficitur. Cras sollicitudin vitae neque ac viverra. Nunc nisi ante, vulputate sed interdum sit amet, porttitor at lectus. '
+            ]
+        ]);
+
+        DB::table('privacies')->insert([
+            [
+                'name' => 'Default',
+                'text' => 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi libero orci, sodales vitae ipsum quis, varius maximus ligula. Donec dapibus, ex ac hendrerit tincidunt, libero dui interdum augue, et elementum nunc purus quis sapien. Aliquam varius nunc ut arcu fringilla scelerisque. Integer lacinia dictum tincidunt. Praesent accumsan dolor et magna faucibus posuere. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Donec risus ligula, aliquam ut leo id, imperdiet pharetra elit. Sed malesuada, leo vel ultrices ultricies, magna metus pharetra urna, sit amet varius felis erat ut eros. Fusce ullamcorper arcu eu mi accumsan luctus. Sed gravida nunc at quam bibendum tempus. Vestibulum placerat sodales mauris, quis suscipit urna pretium id.
+
+                Donec tincidunt pellentesque diam quis finibus. Sed ex mi, porttitor in nisi eu, dignissim volutpat lectus. Nam a nisl elementum nisl aliquam fermentum scelerisque et nisi. Cras vel ullamcorper diam, ut semper eros. Curabitur eu fermentum nunc, feugiat finibus arcu. Aenean sit amet odio ligula. Maecenas eu sem at mi lobortis semper. Donec tellus diam, pulvinar sit amet nunc non, feugiat imperdiet nunc. Nullam malesuada tincidunt enim a efficitur. Cras sollicitudin vitae neque ac viverra. Nunc nisi ante, vulputate sed interdum sit amet, porttitor at lectus.
+                
+                Etiam ex mi, dictum ac consequat at, fermentum id libero. Etiam placerat lacinia lectus et egestas. Nam nec malesuada neque, ut sollicitudin ante. Suspendisse ut diam eu tortor placerat condimentum. Vivamus nisl massa, blandit at tortor sit amet, fermentum consequat lectus. Vivamus vel dignissim ante. Nam a pulvinar augue. Integer gravida, dui ut imperdiet faucibus, lacus ante faucibus ante, sed ullamcorper lectus magna at lacus. Aliquam nec maximus arcu, sed malesuada ipsum. Sed porta diam risus, molestie pellentesque urna placerat sed.
+                
+                Etiam in risus orci. Fusce maximus urna non condimentum tempus. Vivamus vel lacus magna. In ac sapien vitae nisi dictum mattis eget vitae arcu. Nam in nulla pulvinar, eleifend justo non, tempus diam. Duis nec tellus at mi aliquam rutrum pellentesque quis ligula. Donec mollis porta arcu, id eleifend nibh. Nam porttitor orci sit amet pulvinar lacinia. In hac habitasse platea dictumst. Sed nec imperdiet leo, scelerisque commodo massa. Morbi sed augue velit. Praesent eu odio efficitur, consequat nisl tempor, iaculis dolor.
+                
+                Pellentesque ut ante bibendum, pulvinar nulla vehicula, ultrices odio. Nam eu velit vehicula, volutpat sem at, fermentum arcu. Etiam molestie, enim id accumsan tempus, tellus nulla fringilla enim, id pretium tortor dui eu magna. Aliquam dapibus ac dolor id varius. Fusce sagittis non lorem venenatis vestibulum. Suspendisse potenti. Nulla facilisi. Morbi euismod tortor enim, a convallis nisi convallis vitae. Nulla scelerisque, nunc sed facilisis mollis, nulla felis ornare justo, eu ultricies lacus lectus tristique tellus. Proin lacus sem, placerat et purus eu, ultrices sollicitudin augue. Sed ultrices non tortor a accumsan. Fusce faucibus turpis nec arcu interdum bibendum. Suspendisse turpis ligula, tempor non purus eu, consectetur cursus eros. Vestibulum fringilla, tortor a convallis aliquet, nulla sapien suscipit enim, a volutpat velit metus volutpat velit. '
+            ]
         ]);
 
     }

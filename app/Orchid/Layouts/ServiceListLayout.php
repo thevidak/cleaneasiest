@@ -21,7 +21,7 @@ class ServiceListLayout extends Table {
                 return Link::make($service->id)
                     ->route('service.edit', $service);
             }),
-            
+
             TD::make('name', __('Ime'))
                 ->sort()
                 ->cantHide()

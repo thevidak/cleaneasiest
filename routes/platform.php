@@ -39,6 +39,7 @@ use App\Orchid\Screens\ServiceListScreen;
 use App\Orchid\Screens\ServiceEditScreen;
 
 use App\Orchid\Screens\WeightClass\WeightClassListScreen;
+use App\Orchid\Screens\ClothesType\ClothesTypeListScreen;
 use App\Orchid\Screens\Options\RejectReasonListScreen;
 
 
@@ -155,6 +156,7 @@ Route::screen('services', ServiceListScreen::class)->name('service.list');
 Route::screen('service/{service?}', ServiceEditScreen::class)->name('service.edit');
 
 Route::screen('weights', WeightClassListScreen::class)->name('weight.list');
+Route::screen('clothes', ClothesTypeListScreen::class)->name('clothes.list');
 
 Route::screen('reasons', RejectReasonListScreen::class)->name('reason.list');
 

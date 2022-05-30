@@ -17,11 +17,14 @@ use Orchid\Screen\Screen;
 use Orchid\Support\Facades\Alert;
 use Orchid\Screen\Fields\Label;
 use Orchid\Screen\Actions\Link;
+use Orchid\Screen\TD;
+
 
 use App\Models\Order;
 use App\Models\User;
 use App\Models\Service;
 use App\Models\WeightClass;
+use App\Models\ServiceType;
 
 class OrderShowScreen extends Screen {
 
@@ -34,14 +37,23 @@ class OrderShowScreen extends Screen {
     public function query(Order $order): array {
         $services = [];
         foreach ($order->services as $service_group) {
-            $service_id = $service_group["service_ids"][0];
-            $weight_class_id = $service_group["weight_class_id"];
-            $note = $service_group["note"];
-            $services[] = [
-                'name' => Service::where('id',$service_id)->first()->name,
-                'weight' => WeightClass::where('id',$weight_class_id)->first()->name,
-                'note' => $note
-            ];
+            $service_id = $service_group["service_id"];
+            $service_type = Service::where('id',$service_id)->first()->type;
+            if ($service_type == ServiceType::WEIGHTABLE) {
+                $weight_class_id = $service_group["weight_class_id"];
+                $services[] = [
+                    'name' => Service::where('id',$service_id)->first()->name,
+                    'weight' => WeightClass::where('id',$weight_class_id)->first()->name,
+                ];
+            }
+            else if ($service_type == ServiceType::COUNTABLE) {
+                $clothes = $service_group["clothes"];
+                
+                $services[] = [
+                    'name' => Service::where('id',$service_id)->first()->name,
+                    'weight' => "123",
+                ];
+            }
         }
 
         return [
@@ -60,8 +72,8 @@ class OrderShowScreen extends Screen {
                 'id' =>$order->driver_id,
                 'name' => User::where('id',$order->driver_id)->first() != null ? User::where('id',$order->driver_id)->first()->fullName : "Nije dodeljen"
             ],
-            'takeout_data' => $order->takeout_date['date'] . " od " . $order->takeout_date['start_time'] . " do " . $order->takeout_date['end_time'],
-            'delivery_data' => $order->delivery_date['date'] . " od " . $order->delivery_date['start_time'] . " do " . $order->delivery_date['end_time']
+            //'takeout_date' => $order->takeout_date['date'] . " od " . $order->takeout_date['start_time'] . " do " . $order->takeout_date['end_time'],
+            //'delivery_date' => $order->delivery_date['date'] . " od " . $order->delivery_date['start_time'] . " do " . $order->delivery_date['end_time']
         ];
     }
 
@@ -105,9 +117,25 @@ class OrderShowScreen extends Screen {
                 Label::make('delivery_data')
                     ->title('Datum Isporuke')
                     ->horizontal(),
-
+                /*Matrix::make('services')
+                    ->columns([
+                        'name',
+                        'weight'
+                    ])
+                    ->fields([
+                        'name'   => Label::make(),
+                        'weight' => Label::make(),
+                    ])
+                    ->maxRows(5),*/
+                
+                    
             ]),
-            Layout::view('admin.services'),
+/*
+            Layout::table('services' , [
+                TD::make('name'),
+                //TD::make('weight', 'Test')
+            ])
+            */
         ];
     }
 

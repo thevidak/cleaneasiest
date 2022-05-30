@@ -8,6 +8,9 @@ use Orchid\Screen\Screen;
 use Orchid\Support\Facades\Layout;
 use Orchid\Screen\Fields\Group;
 use Orchid\Screen\Fields\Input;
+use Orchid\Screen\Fields\Cropper;
+use Orchid\Screen\Fields\Picture;
+use Orchid\Screen\Fields\Select;
 use Orchid\Screen\Actions\Button;
 use Orchid\Support\Facades\Toast;
 use Orchid\Support\Facades\Alert;
@@ -15,32 +18,73 @@ use Orchid\Screen\Fields\Matrix;
 use Orchid\Screen\Fields\TextArea;
 
 use App\Models\Service;
+use App\Models\ServiceType;
 use App\Models\Price;
 use App\Models\WeightClass;
+use App\Models\ClothesType;
+
 
 class ServiceEditScreen extends Screen {
 
     public $name = 'Dodaj novi servis';
     public $description = 'Detalji o servisu';
+    
     public $exists = false;
 
-    public $prices = [];
+    private $prices = [];
+    private $max_rows =4; 
 
     public function query(Service $service): array {
         $this->exists = $service->exists;
 
-        //$weight_classes = WeightClass::all();
-
         if($this->exists){
             $this->name = 'Izmeni Servis';
 
-            $tmp = Price::where('service_id',$service->id)->get();
-            foreach($tmp as $single_price) {
-                $this->prices[] = [
-                    'name' => WeightClass::where('id',$single_price->weight_class_id)->first()->name,
-                    'value' =>$single_price->value
-                ];
+            $clothes_types = ClothesType::all();
+            $weight_classes = WeightClass::all();
+
+            if ($service->type == ServiceType::COUNTABLE) {
+                foreach($clothes_types as $clothing_type) {
+                    $price = Price::where('service_id', $service->id)->where('weight_class_id',$clothing_type->id)->first();
+                    $this->prices[] = [
+                        'name' => $clothing_type->name,
+                        'value' => isset($price)? $price->value : 0
+                    ];
+                }
             }
+            else if ($service->type == ServiceType::WEIGHTABLE) {
+                foreach($weight_classes as $weight_class) {
+                    $price = Price::where('service_id', $service->id)->where('weight_class_id',$weight_class->id)->first();
+                    $this->prices[] = [
+                        'name' => $weight_class->name,
+                        'value' => isset($price)? $price->value : 0
+                    ];
+                }
+            }
+
+
+            /*
+
+            $tmp = Price::where('service_id',$service->id)->get();
+            if ($service->type == ServiceType::COUNTABLE) {
+                foreach($tmp as $single_price) {
+                    $this->prices[] = [
+                        'name' => ClothesType::where('id',$single_price->weight_class_id)->first()->name,
+                        'value' =>$single_price->value
+                    ];
+                }
+            }
+            else if ($service->type == ServiceType::WEIGHTABLE) {
+                foreach($tmp as $single_price) {
+                    $this->prices[] = [
+                        'name' => WeightClass::where('id',$single_price->weight_class_id)->first()->name,
+                        'value' =>$single_price->value
+                    ];
+                }
+            }
+
+            */
+            
         }
         
         return [
@@ -72,34 +116,49 @@ class ServiceEditScreen extends Screen {
         return [
             Layout::rows([
                 Group::make([
+                    /*
+                    Picture::make('service.description'),
+                        ->storage('public')
+                        ->width(300)
+                        ->height(300)
+                        ->maxFileSize(1)
+                        ->targetRelativeUrl(),*/
                     Input::make('service.name')
                         ->type('text')
                         ->max(255)
                         ->required()
                         ->title(__('Ime'))
                         ->placeholder(__('Ime')),
+                    Select::make('service.type')
+                        ->options([
+                            '0'   => 'Po tezini',
+                            '1' => 'Po komadu',
+                        ])
+                        ->title('Tip servisa')
+                        ->help('Servisi po komadu ili po tezini'),
                     Input::make('service.description')
                         ->type('text')
                         ->max(255)
                         ->required()
                         ->title(__('Opis'))
                         ->placeholder(__('Opis')),
+                        
                 ])->fullWidth(),
             ]),
             Layout::rows([
                 Group::make([
                     Matrix::make('prices')
                     ->columns([
-                        'Kilaza' => 'name', 
+                        'Tip' => 'name', 
                         'Cena' => 'value'
                     ])
                     ->fields([
                         'Kilaza'   => Input::make()->type('number'),
                         'Cena' => TextArea::make(),
                     ])
-                    ->maxRows(4),
+                    ->maxRows(5),
                 ])->fullWidth(),
-            ])
+            ])->canSee($this->exists)
         ];
     }
 
