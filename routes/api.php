@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ClientOrderController;
+use App\Http\Controllers\WorkerOrderController;
+use App\Http\Controllers\DriverOrderController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\WeightClassController;
 use App\Http\Controllers\ShopController;
@@ -15,7 +17,7 @@ use App\Models\User;
 use App\Mail\NewUserNotification;
 
 Route::get('test', function()  {
-    \Mail::to('thevidak@yahoo.com')->send(new \App\Mail\NewUserNotification);
+    //\Mail::to('thevidak@yahoo.com')->send(new \App\Mail\NewUserNotification);
 });
 Route::post('test', [UserController::class, 'test']);
 Route::post('upload-test', [UserController::class, 'testUpload']);
@@ -44,53 +46,44 @@ Route::group(['middleware'=>['auth:sanctum']], function (){
 
     // requires Worker role
     Route::group(['prefix' => 'worker','middleware'=>['is.worker']], function (){
-        Route::get('/orders/total-number', [OrderController::class, 'workerGetNumberOfTotalOrders']);
-        Route::get('/orders/new-list', [OrderController::class, 'workerGetListOfNewOrders']);
-        Route::get('/orders/accepted-list', [OrderController::class, 'workerGetListOfAcceptdeOrders']);
-        Route::post('/orders/new-order-data', [OrderController::class, 'workerGetOrderData']);
-        Route::post('/orders/change-new-order-data', [OrderController::class, 'workerChangeOrderData']);
-        Route::post('/orders/accepted-order-map', [OrderController::class, 'workerLoadAcceptedOrderMap']);
-        Route::post('/orders/accepted-order-info', [OrderController::class, 'workerGetOrderData']);
-        Route::post('/orders/accepted-order-status', [OrderController::class, 'workerGetOrderStatus']);
-        Route::get('/reject-reasons', [OrderController::class, 'workerRejectReasons']);
+        Route::get('/orders/total-number', [WorkerOrderController::class, 'workerGetNumberOfTotalOrders']);
+        Route::get('/orders/new-list', [WorkerOrderController::class, 'workerGetListOfNewOrders']);
+        Route::get('/orders/accepted-list', [WorkerOrderController::class, 'workerGetListOfAcceptdeOrders']);
+        Route::post('/orders/new-order-data', [WorkerOrderController::class, 'workerGetOrderData']);
+        Route::post('/orders/change-new-order-data', [WorkerOrderController::class, 'workerChangeOrderData']);
+        Route::post('/orders/accepted-order-map', [WorkerOrderController::class, 'workerLoadAcceptedOrderMap']);
+        Route::post('/orders/accepted-order-info', [WorkerOrderController::class, 'workerGetOrderData']);
+        Route::post('/orders/accepted-order-status', [WorkerOrderController::class, 'workerGetOrderStatus']);
+        Route::get('/reject-reasons', [WorkerOrderController::class, 'workerRejectReasons']);
 
         # old
         //Route::post('/orders/accepted-order-load-data', [OrderController::class, 'workerLoadAcceptedOrderData']);
         //Route::post('/orders/accepted-order-delivery-data', [OrderController::class, 'workerLoadAcceptedOrderData']);
         # new
-        Route::post('/orders/order-data', [OrderController::class, 'workerOrderData']);
+        Route::post('/orders/order-data', [WorkerOrderController::class, 'workerOrderData']);
 
         # old
         //Route::post('/orders/accepted-order-set-loaded', [OrderController::class, 'workerSetLoadedAcceptedOrder']);
         //Route::post('/orders/accepted-order-set-delivered', [OrderController::class, 'workerSetDeliveredAcceptedOrder']);
         //Route::post('/orders/accepted-order-set-ready', [OrderController::class, 'workerSetReadydAcceptedOrder']);
         # new 
-        Route::post('/orders/change-status', [OrderController::class, 'workerChangeOrderStatus']);
-
-        
-
+        Route::post('/orders/change-status', [WorkerOrderController::class, 'workerChangeOrderStatus']);
     });
     // requires Driver role
     Route::group(['prefix' => 'driver','middleware'=>['is.driver']], function (){
-
-        Route::get('/orders/total-number', [OrderController::class, 'driverGetNumberOfTotalOrders']);
-        Route::get('/orders/new-list', [OrderController::class, 'driverGetListOfNewOrders']);
-        Route::get('/orders/accepted-list', [OrderController::class, 'driverGetListOfAcceptdeOrders']);
-        Route::post('/orders/accepted-order-status', [OrderController::class, 'driverGetOrderStatus']);
-        Route::post('/orders/new-order-data', [OrderController::class, 'driverNewOrderData']);
-        Route::post('/orders/accept-new-order', [OrderController::class, 'driverAcceptOrder']);
-
-        Route::get('/reject-reasons', [OrderController::class, 'driverGetRejectReasons']);
-        Route::get('/cant-load-from-client-reasons', [OrderController::class, 'driverGetUnableToLoadFromClientReasons']);
-        
-        Route::post('/orders/order-data', [OrderController::class, 'driverOrderData']);
-
-        Route::post('/orders/change-status', [OrderController::class, 'driverChangeOrderStatus']);
-        
+        Route::get('/orders/total-number', [DriverOrderController::class, 'driverGetNumberOfTotalOrders']);
+        Route::get('/orders/new-list', [DriverOrderController::class, 'driverGetListOfNewOrders']);
+        Route::get('/orders/accepted-list', [DriverOrderController::class, 'driverGetListOfAcceptdeOrders']);
+        Route::post('/orders/accepted-order-status', [DriverOrderController::class, 'driverGetOrderStatus']);
+        Route::post('/orders/new-order-data', [DriverOrderController::class, 'driverNewOrderData']);
+        Route::post('/orders/accept-new-order', [DriverOrderController::class, 'driverAcceptOrder']);
+        Route::get('/reject-reasons', [DriverOrderController::class, 'driverGetRejectReasons']);
+        Route::get('/cant-load-from-client-reasons', [DriverOrderController::class, 'driverGetUnableToLoadFromClientReasons']);
+        Route::post('/orders/order-data', [DriverOrderController::class, 'driverOrderData']);
+        Route::post('/orders/change-status', [DriverOrderController::class, 'driverChangeOrderStatus']);
     });
     // requires Client role
     Route::group(['prefix' => 'client','middleware'=>['is.client']], function (){
-
         Route::get('/service-types', [ServiceController::class, 'clientGetAllServiceTypes']);
         Route::post('/service-prices', [ServiceController::class, 'clientGetServicePrices']);
         
@@ -130,9 +123,12 @@ Route::group(['middleware'=>['auth:sanctum']], function (){
         Route::post('/orders/order-rating', [ClientOrderController::class, 'clientSetOrderRating']);
         Route::get('/orders/current-total-price', [ClientOrderController::class, 'clientGetTotalCartPrice']);
         Route::post('/remove-service', [ClientOrderController::class, 'clientDeleteService']);
+        Route::post('/remove-subservice', [ClientOrderController::class, 'clientDeleteSubservice']);
         Route::get('/orders/empty-cart', [ClientOrderController::class, 'clientEmptyCart']);
         Route::get('/privacy', [ClientOrderController::class, 'clientGetPrivacy']);
         Route::get('/faq', [ClientOrderController::class, 'clientGetFaqs']);
         Route::get('/orders/history', [ClientOrderController::class, 'clientGetOrderHistory']);
+
+        Route::post('/test', [ClientOrderController::class, 'clientTest']);
     });
 });

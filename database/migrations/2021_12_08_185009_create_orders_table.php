@@ -19,15 +19,19 @@ class CreateOrdersTable extends Migration
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
             $table->integer('status');
-            $table->json('services')->nullable();
             $table->foreignId('client_id')->nullable();
-            $table->json('order_info')->nullable();
-            $table->json('payment_info')->nullable();
+            $table->foreignId('driver_id')->nullable();
+            $table->foreignId('worker_id')->nullable();
+            $table->foreignId('address_id')->nullable();
+            $table->foreignId('card_id')->nullable();
+            
             $table->json('takeout_date')->nullable();
             $table->json('delivery_date')->nullable();
             $table->decimal('price');
-            $table->foreignId('driver_id')->nullable();
-            $table->foreignId('worker_id')->nullable();
+
+            $table->json('order_info')->nullable();
+            $table->json('payment_info')->nullable();
+            $table->json('services')->nullable();
             $table->timestamps();
         });
     }

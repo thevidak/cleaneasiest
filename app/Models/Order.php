@@ -9,6 +9,8 @@ use App\Models\Users;
 use App\Models\Service;
 use App\Models\ServiceType;
 use App\Models\Price;
+use App\Models\SubService;
+use App\Models\ClothesType;
 
 use Orchid\Filters\Filterable;
 use Orchid\Screen\AsSource;
@@ -36,7 +38,7 @@ class Order extends Model
 {
     use HasFactory, AsSource, Filterable;
 
-    protected $fillable = ['status', 'client_id', 'services', 'client_id', 'order_info', 'payment_info', 'takeout_date', 'delivery_date', 'price'];
+    protected $fillable = ['status', 'client_id', 'services', 'client_id', 'order_info', 'payment_info', 'takeout_date', 'delivery_date', 'price', 'address_id', 'card_id'];
 
     protected $casts = [
         'services' => 'array',
@@ -57,26 +59,24 @@ class Order extends Model
         'updated_at'
     ];
 
+
+
+    public function subservices() {
+        return $this->hasMany(SubService::class);
+    }
+
     // calculate price for the existing order, using info from the services field and saves it
     public function calculatePrice() {
-        $services = $this->services;
         $price = 0;
-
-        foreach ($services as $service) {
-            $service_type = Service::where('id', $service['service_id'])->first()->type;
-            if ($service_type==ServiceType::WEIGHTABLE) {
-                $service_price = Price::where("service_id",$service["service_id"])->where("weight_class_id", $service["weight_class_id"])->first()->value;
-                $price += $service_price;
+        $subservices = $this->subservices;
+        foreach ($subservices as $subservice) {
+            if (isset($subservice->amount)) {
+                $price += Price::where('service_id', $subservice->service_id)->where('weight_class_id', $subservice->subclass_type_id)->first()->value * $subservice->amount;
             }
-            else if ($service_type==ServiceType::COUNTABLE) {
-                $service_price = 0;
-                foreach ($service['clothes'] as $clothing_item) {
-                    $service_price +=Price::where("service_id",$service["service_id"])->where("weight_class_id", $clothing_item["clothes_type_id"])->first()->value * $clothing_item["count"];
-                }
-                $price += $service_price;
+            else {
+                $price += Price::where('service_id', $subservice->service_id)->where('weight_class_id', $subservice->subclass_type_id)->first()->value * 1;
             }
         }
-
         $this->price = $price;
         $this->save();
         return $price;
@@ -87,6 +87,7 @@ class Order extends Model
     // return DateTime object
     public function getDateTime($type, $flag) {
         if ($type == 'takeout') {
+            if(!isset($this->takeout_date)) return;
             if ($flag == 'start') {
                 //$datetime = new \DateTime($this->takeout_date["date"] . " " . $this->takeout_date["start_time"]);
                 $datetime = \DateTime::createFromFormat('d-m-Y H:i', $this->takeout_date["date"] . " " . $this->takeout_date["start_time"]);
@@ -97,6 +98,7 @@ class Order extends Model
             }
         }
         else if ($type == 'delivery') {
+            if(!isset($this->delivery_date)) return;
             if ($flag == 'start') {
                 //$datetime =  new \DateTime($this->delivery_date["date"] . " " . $this->delivery_date["start_time"]);
                 $datetime = \DateTime::createFromFormat('d-m-Y H:i', $this->delivery_date["date"] . " " . $this->takeout_date["start_time"]);
@@ -182,6 +184,140 @@ class Order extends Model
         return $locations;
     }
 
+    public function getSubserviceListAttribute() {
+        $result = [];
+        $countable = [];
+        foreach ($this->subservices as $subservice){
+            $service = Service::where('id',$subservice['service_id'])->first();
+            $price = Price::where('service_id',$service->id)->where('weight_class_id', $subservice['subclass_type_id'])->first()->value;
+            // if weightable
+            if ($service->type == 0) {
+                $result[] = [
+                    'service_id' => $service->id,
+                    'service_type' => "weightable",
+                    'service_name' => $service->name,
+                    'subservice_id' => $subservice['id'],
+                    'amount' => WeightClass::where('id', $subservice['subclass_type_id'])->first()->name,
+                    'price' => $price * 1  
+                ];
+            }
+            else {
+                $countable[$service->id][] = [
+                    'subservice_id' => $subservice['id'],
+                    'item' => ClothesType::where('id', $subservice['subclass_type_id'])->first()->name,
+                    'amount' => $subservice['amount'],
+                    'price' => $price * $subservice['amount'] 
+                ];
+            }   
+        }
+        $subresult = [];
+        foreach ($countable as $key=>$c) {
+            $tmp_price = 0;
+            foreach ($c as $p) {
+                $tmp_price += $p['price'];
+            }
+            $result[] = [
+                'service_id' => $key,
+                'service_type' => "countable",
+                'service_name' => $service->name,
+                'price' => $tmp_price,
+                'items' => $c
+            ];
+        }
+        return $result;
+    }
+
+    public function getSubserviceGroupedListAttribute () {
+        $subservices_grouped = [];
+        $result = [];
+        
+        foreach ($this->subservices as $subservice) {
+            $service = Service::where('id',$subservice->service_id)->first();
+            $local_price = Price::where('service_id',$service->id)->where('weight_class_id', $subservice->subclass_type_id)->first()->value;
+            if ($service->type == 0) {
+                $subclass_name = WeightClass::where('id',$subservice->subclass_type_id)->first()->name;
+                if (!isset($subservices_grouped[$subservice->service_id])) {
+                    $subservices_grouped[$subservice->service_id] = [
+                        'price' => 0,
+                        'items' => []
+                    ];
+                }
+
+                $subservices_grouped[$subservice->service_id]['price'] += $local_price * 1;
+
+                $existing = FALSE;
+
+                foreach ($subservices_grouped[$subservice->service_id]['items'] as $key=>$item) {
+                    if ($item['class_id'] == $subservice->subclass_type_id) {
+                        $subservices_grouped[$subservice->service_id]['items'][$key]['amount'] ++;
+                        $existing = TRUE;
+                        break;
+                    }
+                }
+
+                if (!$existing) {
+                    $subservices_grouped[$subservice->service_id]['items'][] = [
+                        'class_id' => $subservice->subclass_type_id,
+                        'class_name' => $subclass_name,
+                        'price' => $local_price,
+                        'amount' => 1
+                    ];
+                }
+
+            }
+            
+            else {
+                $subclass_name = ClothesType::where('id',$subservice->subclass_type_id)->first()->name;
+                if (!isset($subservices_grouped[$subservice->service_id])) {
+                    $subservices_grouped[$subservice->service_id] = [
+                        'price' => 0,
+                        'items' => []
+                    ];
+                }
+
+                $subservices_grouped[$subservice->service_id]['price'] += $local_price * $subservice->amount;
+
+                $existing = FALSE;
+
+                foreach ($subservices_grouped[$subservice->service_id]['items'] as $key=>$item) {
+                    if ($item['class_id'] == $subservice->subclass_type_id) {
+                        $subservices_grouped[$subservice->service_id]['items'][$key]['amount'] += $subservice->amount;
+                        $existing = TRUE;
+                        break;
+                    }
+                }
+
+                if (!$existing) {
+                    $subservices_grouped[$subservice->service_id]['items'][] = [
+                        'class_id' => $subservice->subclass_type_id,
+                        'class_name' => $subclass_name,
+                        'price' => $local_price,
+                        'amount' => $subservice->amount
+                    ];
+                }
+                
+            }
+            
+        }
+
+        $full_price = 0;
+        foreach ($subservices_grouped as $key=>$value) {
+            $full_price += $value['price'];
+            $result[] = [
+                "id" => $key,
+                "type" => Service::where('id',$key)->first()->name,
+                "price" => $value['price'],
+                "items" => $value['items']
+            ];
+        }
+
+
+        return [
+            "services" => $result,
+            "fullPrice" => $full_price,
+        ];
+    }
+
 
 
 /*
@@ -240,59 +376,5 @@ class Order extends Model
     public function getServiceTextAttribute () {
         return '<div>123</div>';
         return json_encode($this->services);
-    }
-
-    public function servicesGroupFormated () {
-        $full_price = 0;
-        $result = [];
-        foreach ($this->services as $service) {
-            $service_obj = Service::where('id',$service['service_id'])->first();
-            $service_type = $service_obj->type;
-
-            if ($service_type == ServiceType::WEIGHTABLE) {
-                $price = Price::where('service_id',$service['service_id'])->where('weight_class_id',$service["weight_class_id"])->first()->value * 1;
-                $result[] = [
-                    "id" => $service_obj->id,
-                    "type" => $service_obj->name,
-                    "price" => $price
-                ];
-                $full_price += $price;
-            }
-            else if ($service_type == ServiceType::COUNTABLE) {
-                $price = 0;
-                foreach ($service['clothes'] as $clothing_item) {
-                    $price += Price::where('service_id',$service['service_id'])->where('weight_class_id',$clothing_item["clothes_type_id"])->first()->value * $clothing_item["count"];
-                }
-                $result[] = [
-                    "id" => $service_obj->id,
-                    "type" => $service_obj->name,
-                    "price" => $price
-                ];
-                $full_price += $price;
-            }
-        }
-
-        $output = [];
-
-        foreach ($result as $service) {
-            $repeated = FALSE;
-            foreach ($output as $key=>$single) {
-                if ($service['id'] == $single['id']) {
-                    $output[$key]["price"] += $service['price'];
-                    $repeated = TRUE;
-                    break;
-                }
-            }
-            if (!$repeated) {
-                $output[] = $service;
-            }
-        }
-
-
-
-        return [
-            "services" => $output,
-            "fullPrice" => $full_price
-        ];
     }
 }

@@ -19,8 +19,52 @@ use App\Models\Faq;
 use App\Models\Privacy;
 use App\Models\ClientInfo;
 use App\Models\CreditCard;
+use App\Models\SubService;
 
 class ClientOrderController extends Controller{
+
+    public function clientTest(Request $request){
+        return Order::where('id',$request->id)->first()->calculatePrice();
+    }
+
+    private function calculateDistance($starting_location, $ending_location) {
+    
+        $start = $starting_location['latitude'] . "," . $starting_location['longitude'];
+        $end = $ending_location['latitude'] . "," . $ending_location['longitude'];
+
+        $response = Http::get('https://maps.googleapis.com/maps/api/distancematrix/json', [
+            'origins' => $start,
+            'destinations' => $end,
+            'key' => env('GOOGLE_API_KEY',false)
+        ]);
+
+        $calulated_distances = json_decode($response->body());
+
+        $time_remaining = $calulated_distances->rows[0]->elements[0]->duration;
+
+        return $time_remaining;
+    }
+
+    private function formatTime ($seconds) {
+        $minutes = (int)($seconds/60);
+        if ($minutes < 60) {
+            return $minutes . "min";
+        }
+        else if ($minutes < 1440){
+            $hours = (int)($minutes/60);
+            return $hours . "h";
+        }
+        else {
+            $days = (int)($minutes/1440);
+            return $days == 1 ? $days . " dan" : $days . " dana";
+        }
+    }
+
+    private function timeDifference($start, $end) {
+        $difference_in_seconds = abs($start->format('U') - $end->format('U'));
+        return $this->formatTime($difference_in_seconds);
+    }
+
 
     public function clientCreateOrder(Request $request) {
         $request->validate(['payment_info' => 'required', 'takeout_date' => 'required', 'order_info' => 'required']);
@@ -67,6 +111,7 @@ class ClientOrderController extends Controller{
         // For weightable services
         if ($service_type == ServiceType::WEIGHTABLE) {
             if (!isset($request->weight_class_id)) return response()->json(["status" => 0,"errorMessage" => "Polje weight_class_id ne postoji"]);
+            
             if (isset($current_order)) {
                 $tmp = $current_order->services;
                 array_push($tmp, [
@@ -76,6 +121,14 @@ class ClientOrderController extends Controller{
             );
                 $current_order->services = $tmp;
                 $current_order->save();
+                
+                // new subservices 
+                SubService::create([
+                    "order_id" => $current_order->id,
+                    "service_id" => $request->service_id,
+                    "subclass_type_id" => $request->weight_class_id
+                ]);
+
                 $current_order->calculatePrice();
                 return response()->json([
                     "status" => 1
@@ -91,11 +144,20 @@ class ClientOrderController extends Controller{
                     'status' => OrderStatus::ORDER_IN_CREATION,
                     'price' => 0
                 ]);
+                
+                // new subservices 
+                SubService::create([
+                    "order_id" => $order->id,
+                    "service_id" => $request->service_id,
+                    "subclass_type_id" => $request->weight_class_id
+                ]);
                 $order->calculatePrice();
                 return response()->json([
                     "status" => 1
                 ]);
             }
+
+            
         }
         
         // For countable services
@@ -110,6 +172,16 @@ class ClientOrderController extends Controller{
             );
                 $current_order->services = $tmp;
                 $current_order->save();
+                
+                // new subservices 
+                foreach ($request->clothes as $single_clothes) {
+                    SubService::create([
+                        "order_id" => $current_order->id,
+                        "service_id" => $request->service_id,
+                        "subclass_type_id" => $single_clothes["clothes_type_id"],
+                        "amount" => $single_clothes["count"]
+                    ]);
+                }
                 $current_order->calculatePrice();
                 return response()->json([
                     "status" => 1
@@ -125,11 +197,23 @@ class ClientOrderController extends Controller{
                     'status' => OrderStatus::ORDER_IN_CREATION,
                     'price' => 0
                 ]);
+                
+                // new subservices 
+                foreach ($request->clothes as $single_clothes) {
+                    SubService::create([
+                        "order_id" => $order->id,
+                        "service_id" => $request->service_id,
+                        "subclass_type_id" => $single_clothes["clothes_type_id"],
+                        "amount" => $single_clothes["count"]
+                    ]);
+                }
                 $order->calculatePrice();
                 return response()->json([
                     "status" => 1
                 ]);
             }
+
+            
         }
 
        
@@ -152,6 +236,13 @@ class ClientOrderController extends Controller{
                 }
             }
 
+            # delete subservices
+            foreach ($current_order->subservices as $subservice) {
+                if ($subservice->service_id == $service_to_remove->id) {
+                    $subservice->delete();
+                }
+            }
+
             if (empty($all_services)) {
                 $current_order->delete();
                 return response()->json([
@@ -159,7 +250,7 @@ class ClientOrderController extends Controller{
                 ]);
             }
 
-            $current_order->services = $all_services;
+            $current_order->services = array_values($all_services);
             $current_order->save();
             $current_order->calculatePrice();
            
@@ -167,6 +258,27 @@ class ClientOrderController extends Controller{
                 "status" => 1
             ]);
         }
+
+        return response()->json(["status" => 0,"errorMessage" => "Error"]);
+    }
+
+
+    public function clientDeleteSubservice(Request $request) {
+        $request->validate(['subservice_id' => 'required']);
+
+        $current_order = Order::where('client_id', Auth::id())->where('status', OrderStatus::ORDER_IN_CREATION)->first();
+        if (!isset($current_order)) return response()->json(["status" => 0,"errorMessage" => "Korpa je prazna"]);
+
+        $subservice = SubService::where('id',$request->subservice_id)->where('order_id', $current_order->id)->first();
+        if (!isset($subservice)) return response()->json(["status" => 0,"errorMessage" => "Servis sa datim ID-em nedostupan"]); 
+
+        $subservice->delete();
+
+        return response()->json([
+            "status" => 1
+        ]);
+        
+
 
         return response()->json(["status" => 0,"errorMessage" => "Error"]);
     }
@@ -332,11 +444,12 @@ class ClientOrderController extends Controller{
         $order = Order::where('id', $request->jbp)->first();
         if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Unavailable order']);
 
-        $result = $order->servicesGroupFormated();
+        $result = $order->subserviceGroupedList;
         return response()->json([
             'status' => 1,
             "services" => $result['services'],
-            "totalPrice" => $result['fullPrice']
+            "totalPrice" => $result['fullPrice'],
+            'subservices' => $order->subserviceList
         ]);
     }
 
@@ -348,7 +461,9 @@ class ClientOrderController extends Controller{
             "name" => $client->name . " " . $client->surname,
             "phone" => $client->phone,
             "email" => $client->email,
-            "address" => $client->address
+            "address" => $client->address,
+            "active_address" => $client->activeAddress,
+            "active_card" => $client->activeCard
         ]);
     }
 
@@ -357,12 +472,13 @@ class ClientOrderController extends Controller{
 
         if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => 'No pending orders']);
 
-        $result = $order->servicesGroupFormated();
+        $result = $order->subserviceGroupedList;
         
         return response()->json([
             //'status' => 1,
             "services" => $result['services'],
-            "totalPrice" => $result['fullPrice']
+            "totalPrice" => $result['fullPrice'],
+            "subservices" =>$order->subserviceList
         ]);
     }
 
@@ -371,7 +487,7 @@ class ClientOrderController extends Controller{
 
         if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Unavailable order']);
 
-        $result = $order->servicesGroupFormated();
+        $result = $order->subserviceGroupedList;
         
         return response()->json([
             'status' => 1,
@@ -402,7 +518,8 @@ class ClientOrderController extends Controller{
 
         return response()->json([
             "status" => 1,
-            "services" => $result
+            "services" => $order->subserviceGroupedList['services'],
+            "subservices" => $order->subserviceList
         ]);
     }
 
@@ -493,7 +610,13 @@ class ClientOrderController extends Controller{
 
         if (!isset($order)) return response()->json(['status' => 0, 'errorMessage' => 'Cart already empty']);
 
+        # delete subservices
+        foreach ($order->subservices as $subservice) {
+            $subservice->delete();
+        }
+        
         $order->delete();
+
         return response()->json(['status' => 1]);
     }
 

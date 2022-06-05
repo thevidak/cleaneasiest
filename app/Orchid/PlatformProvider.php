@@ -82,6 +82,16 @@ class PlatformProvider extends OrchidServiceProvider
             ->icon('close')
             ->route('reason.list')
             ->permission('platform.systems.users'),
+
+            Menu::make(__('Staticni Text'))
+            ->icon('text-left')
+            ->route('statictext.list')
+            ->permission('platform.systems.users'),
+
+            Menu::make(__('Privatnost'))
+            ->icon('lock')
+            ->route('privacy.list')
+            ->permission('platform.systems.users'),
           
            
 /*

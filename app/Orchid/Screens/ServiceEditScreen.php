@@ -116,13 +116,11 @@ class ServiceEditScreen extends Screen {
         return [
             Layout::rows([
                 Group::make([
-                    /*
-                    Picture::make('service.description'),
-                        ->storage('public')
-                        ->width(300)
-                        ->height(300)
-                        ->maxFileSize(1)
-                        ->targetRelativeUrl(),*/
+                    Picture::make('picture')
+                        ->title('Picture')
+                        ->maxFileSize(8)
+                        ->horizontal(),
+                    
                     Input::make('service.name')
                         ->type('text')
                         ->max(255)

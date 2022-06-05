@@ -68,3 +68,18 @@ function googleAPIGetGeoLocationFromAddress ($address) {
         "longitude" => 20.42967,
     ];
 }
+
+function gFormatTime ($seconds) {
+    $minutes = (int)($seconds/60);
+    if ($minutes < 60) {
+        return $minutes . "min";
+    }
+    else if ($minutes < 1440){
+        $hours = (int)($minutes/60);
+        return $hours . "h";
+    }
+    else {
+        $days = (int)($minutes/1440);
+        return $days == 1 ? $days . " dan" : $days . " dana";
+    }
+}

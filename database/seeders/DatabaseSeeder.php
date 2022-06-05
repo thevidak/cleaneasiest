@@ -32,6 +32,10 @@ class DatabaseSeeder extends Seeder
                 'name' => "DRIVER_CANT_LOAD_FROM_CLIENT_REASONS",
                 'value' => json_encode(["Klijent nije na adresi", "Klijent ne odgovara na telefon"])
             ],
+            [
+                'name' => "SUPPORT_TEXT",
+                'value' => json_encode(["title"=>"Podrska", "text"=> "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."])
+            ],
         ]);
 
         DB::table('user_roles')->insert([
@@ -162,7 +166,7 @@ class DatabaseSeeder extends Seeder
             ]
         ]);
 
-        
+        /*
         DB::table('orders')->insert([
             [
                 'status' => 1,
@@ -170,8 +174,8 @@ class DatabaseSeeder extends Seeder
                 'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
                 'payment_info' => json_encode(['type' => 0]),
                 'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
-                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
-                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'takeout_date' => json_encode(["date" => date("d-m-Y",strtotime("+1 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("d-m-Y",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
                 'price' => 750,
                 'worker_id' => 2,
                 'driver_id' => 3,
@@ -182,8 +186,8 @@ class DatabaseSeeder extends Seeder
                 'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
                 'payment_info' => json_encode(['type' => 0]),
                 'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
-                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
-                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'takeout_date' => json_encode(["date" => date("d-m-Y",strtotime("+1 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("d-m-Y",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
                 'price' => 750,
                 'worker_id' => 2,
                 'driver_id' => 3,
@@ -194,8 +198,8 @@ class DatabaseSeeder extends Seeder
                 'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
                 'payment_info' => json_encode(['type' => 0]),
                 'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
-                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
-                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'takeout_date' => json_encode(["date" => date("d-m-Y",strtotime("+1 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("d-m-Y",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
                 'price' => 750,
                 'worker_id' => 2,
                 'driver_id' => 3,
@@ -206,8 +210,8 @@ class DatabaseSeeder extends Seeder
                 'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
                 'payment_info' => json_encode(['type' => 0]),
                 'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
-                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
-                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'takeout_date' => json_encode(["date" => date("d-m-Y",strtotime("+1 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("d-m-Y",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
                 'price' => 750,
                 'worker_id' => 2,
                 'driver_id' => 3,
@@ -218,8 +222,8 @@ class DatabaseSeeder extends Seeder
                 'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
                 'payment_info' => json_encode(['type' => 0]),
                 'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
-                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
-                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'takeout_date' => json_encode(["date" => date("d-m-Y",strtotime("+1 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("d-m-Y",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
                 'price' => 750,
                 'worker_id' => 2,
                 'driver_id' => 3,
@@ -230,8 +234,8 @@ class DatabaseSeeder extends Seeder
                 'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
                 'payment_info' => json_encode(['type' => 0]),
                 'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
-                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
-                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'takeout_date' => json_encode(["date" => date("d-m-Y",strtotime("+1 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("d-m-Y",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
                 'price' => 750,
                 'worker_id' => 2,
                 'driver_id' => 3,
@@ -242,8 +246,8 @@ class DatabaseSeeder extends Seeder
                 'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
                 'payment_info' => json_encode(['type' => 0]),
                 'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
-                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
-                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'takeout_date' => json_encode(["date" => date("d-m-Y",strtotime("+1 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("d-m-Y",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
                 'price' => 750,
                 'worker_id' => 2,
                 'driver_id' => 3,
@@ -254,8 +258,8 @@ class DatabaseSeeder extends Seeder
                 'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
                 'payment_info' => json_encode(['type' => 0]),
                 'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
-                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
-                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'takeout_date' => json_encode(["date" => date("d-m-Y",strtotime("+1 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("d-m-Y",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
                 'price' => 750,
                 'worker_id' => 2,
                 'driver_id' => 3,
@@ -266,14 +270,107 @@ class DatabaseSeeder extends Seeder
                 'services' => json_encode([["service_id"=>3,"weight_class_id"=>2],["service_id"=>2,"weight_class_id"=>3]]),
                 'payment_info' => json_encode(['type' => 0]),
                 'order_info' => json_encode(["address"=>"Bulevar Zorana Djindjica 22, Beograd","note"=>"asdg","location"=>["latitude"=>44.833256,"longitude"=>20.42957]]),
-                'takeout_date' => json_encode(["date" => date("Y-m-d",strtotime("now")), "start_time" => "12:00", 'end_time'=>'22:00']),
-                'delivery_date' => json_encode(["date" => date("Y-m-d",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'takeout_date' => json_encode(["date" => date("d-m-Y",strtotime("+1 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
+                'delivery_date' => json_encode(["date" => date("d-m-Y",strtotime("+2 day")), "start_time" => "12:00", 'end_time'=>'22:00']),
                 'price' => 750,
                 'worker_id' => 2,
                 'driver_id' => 3,
             ],
         ]);
 
+        DB::table('sub_services')->insert([
+            [
+                "order_id" => 1,
+                "service_id" => 3,
+                "subclass_type_id" => 2
+            ],
+            [
+                "order_id" => 1,
+                "service_id" => 2,
+                "subclass_type_id" => 3
+            ],
+            [
+                "order_id" => 2,
+                "service_id" => 3,
+                "subclass_type_id" => 2
+            ],
+            [
+                "order_id" => 2,
+                "service_id" => 2,
+                "subclass_type_id" => 3
+            ],
+            [
+                "order_id" => 3,
+                "service_id" => 3,
+                "subclass_type_id" => 2
+            ],
+            [
+                "order_id" => 3,
+                "service_id" => 2,
+                "subclass_type_id" => 3
+            ],
+            [
+                "order_id" => 4,
+                "service_id" => 3,
+                "subclass_type_id" => 2
+            ],
+            [
+                "order_id" => 4,
+                "service_id" => 2,
+                "subclass_type_id" => 3
+            ],
+            [
+                "order_id" => 5,
+                "service_id" => 3,
+                "subclass_type_id" => 2
+            ],
+            [
+                "order_id" => 5,
+                "service_id" => 2,
+                "subclass_type_id" => 3
+            ],
+            [
+                "order_id" => 6,
+                "service_id" => 3,
+                "subclass_type_id" => 2
+            ],
+            [
+                "order_id" => 6,
+                "service_id" => 2,
+                "subclass_type_id" => 3
+            ],
+            [
+                "order_id" => 7,
+                "service_id" => 3,
+                "subclass_type_id" => 2
+            ],
+            [
+                "order_id" => 7,
+                "service_id" => 2,
+                "subclass_type_id" => 3
+            ],
+            [
+                "order_id" => 8,
+                "service_id" => 3,
+                "subclass_type_id" => 2
+            ],
+            [
+                "order_id" => 8,
+                "service_id" => 2,
+                "subclass_type_id" => 3
+            ],
+            [
+                "order_id" => 9,
+                "service_id" => 3,
+                "subclass_type_id" => 2
+            ],
+            [
+                "order_id" => 9,
+                "service_id" => 2,
+                "subclass_type_id" => 3
+            ],
+        ]);
+        */
         DB::table('faqs')->insert([
             [
                 'question' => 'Prvo Pitanje',
