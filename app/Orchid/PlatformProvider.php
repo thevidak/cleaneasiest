@@ -43,7 +43,7 @@ class PlatformProvider extends OrchidServiceProvider
                 ->route('order.list'),
             
             
-                Menu::make(__('Vozaci'))
+            Menu::make(__('Vozači'))
             ->icon('user')
             ->route('driver.list')
             ->permission('platform.systems.users')
@@ -68,14 +68,14 @@ class PlatformProvider extends OrchidServiceProvider
             ->permission('platform.systems.users')
             ->title('Podešavanja'),
 
-            Menu::make(__('Tezine'))
-            ->icon('basket-loaded')
-            ->route('weight.list')
-            ->permission('platform.systems.users'),
-
-            Menu::make(__('Tipovi Odece'))
+            Menu::make(__('Tipovi Odeće'))
             ->icon('handbag')
             ->route('clothes.list')
+            ->permission('platform.systems.users'),
+            
+            Menu::make(__('Težine'))
+            ->icon('basket-loaded')
+            ->route('weight.list')
             ->permission('platform.systems.users'),
 
             Menu::make(__('Razlozi odbijanja'))
@@ -83,14 +83,19 @@ class PlatformProvider extends OrchidServiceProvider
             ->route('reason.list')
             ->permission('platform.systems.users'),
 
-            Menu::make(__('Staticni Text'))
+            Menu::make(__('Statični tekst'))
             ->icon('text-left')
             ->route('statictext.list')
             ->permission('platform.systems.users'),
 
-            Menu::make(__('Privatnost'))
+            Menu::make(__('Politika privatnosti'))
             ->icon('lock')
             ->route('privacy.list')
+            ->permission('platform.systems.users'),
+
+            Menu::make(__('FAQ'))
+            ->icon('question')
+            ->route('faq.list')
             ->permission('platform.systems.users'),
           
            

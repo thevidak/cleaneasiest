@@ -59,6 +59,16 @@ class Service extends Model
         return [];
     }
 
+    public function getPictureAttribute() {
+        $picture = asset('storage/images/services/' . $this->id. '.png');
+        if (!file_exists(public_path('storage/images/services/' . $this->id. '.png'))) {
+            return asset('storage/images/services/default.png');
+        }
+        else {
+            return $picture;
+        }
+    }
+
     public static function calculatePrices($services) {
         $weights = WeightClass::all();
 

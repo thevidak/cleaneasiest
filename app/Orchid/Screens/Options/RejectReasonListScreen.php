@@ -14,10 +14,8 @@ use App\Models\Options;
 
 class RejectReasonListScreen extends Screen {
 
-    public $name = 'RejectReasonListScreen';
-
-    
-    public $description = 'Detalji o servisu';
+    public $name = 'Razlozi odbijanja';
+    public $description = 'Predefinisani razlozi odbijanja/nemogućnosti preuzimanja pošiljki.';
 
 
     public function query(): array {

@@ -10,13 +10,19 @@ use Orchid\Support\Facades\Toast;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Fields\Matrix;
 use Orchid\Screen\Fields\Label;
+use Orchid\Screen\Actions\Link;
+
+use Orchid\Screen\Layouts\Table;
+use Orchid\Screen\TD;
+use Orchid\Screen\Actions\DropDown;
+
 
 
 use App\Models\ClothesType;
 
 class ClothesTypeListScreen extends Screen {
-    public $name = 'Clothestype';
-    public $description = 'Detalji o servisu';
+    public $name = 'Tipovi odeće';
+    public $description = 'Spisak mogićih artikala odeće pri odaburu servisa';
 
     public function query(): array {
         return [
@@ -26,43 +32,58 @@ class ClothesTypeListScreen extends Screen {
 
     public function commandBar(): array {
         return [
-            Button::make('Sacuvaj Promene')
-                ->icon('note')
-                ->method('update'),
+            Link::make(__('Dodaj Novi'))
+                ->icon('plus')
+                ->route('clothes.edit'),
         ];
     }
 
     public function layout(): array {
         return [
-            Layout::rows([
-                Label::make('static')
-                        ->title('Unesite sve tezine koje korisnik aplikacje moze da izabere:')
-                        ->value(''),
-                Matrix::make('clothes')
-                    ->columns([
-                        'ID' => 'id', 
-                        'Ime' => 'name'
-                    ]),
-            ]),
+            Layout::table('clothes',[
+                TD::make('id', __('ID'))
+                    ->render(function (ClothesType $clothes) {
+                        return Link::make($clothes->id)
+                            ->route('clothes.edit', $clothes);
+                    }),
+                
+                TD::make('name', __('Ime'))
+                    ->sort()
+                    ->cantHide()
+                    
+                    ->render(function (ClothesType $clothes) {
+                        return Link::make($clothes->name)
+                            ->route('clothes.edit', $clothes);
+                    }),
+                
+                TD::make(__('Akcije'))
+                    ->align(TD::ALIGN_CENTER)
+                    ->width('100px')
+                    ->render(function (ClothesType $clothes) {
+                        return DropDown::make()
+                            ->icon('options-vertical')
+                            ->list([
+                                Link::make(__('Promeni'))
+                                    ->route('clothes.edit', $clothes->id)
+                                    ->icon('pencil'),
+                                Button::make(__('Obrisi'))
+                                    ->icon('trash')
+                                    ->confirm(__('Once the account is deleted, all of its resources and data will be permanently deleted. Before deleting your account, please download any data or information that you wish to retain.'))
+                                    ->method('remove', [
+                                        'id' => $clothes->id,
+                                    ]),
+                            ]);
+                    }),
+                
+            ])     
         ];
+
     }
 
-    public function update(Request $request) {
-        $request->validate([
-            'clothes' => 'required'
-        ]);
-
-        ClothesType::truncate();
-
-        foreach ($request->clothes as $single_clothes) {
-            ClothesType::create([
-                'id' => $single_clothes['id'],
-                'name' => $single_clothes['name']
-            ]);
-        }
-
-        Toast::info(__('Test'));
+    public function remove(ClothesType $clothes) {
+        $clothes->delete();
+        Toast::info(__('Artikal je obrisan'));
         return redirect()->route('clothes.list');
-            
     }
+
 }

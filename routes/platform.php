@@ -38,12 +38,15 @@ use App\Orchid\Screens\ClientEditScreen;
 use App\Orchid\Screens\ServiceListScreen;
 use App\Orchid\Screens\ServiceEditScreen;
 
-use App\Orchid\Screens\WeightClass\WeightClassListScreen;
 use App\Orchid\Screens\ClothesType\ClothesTypeListScreen;
+use App\Orchid\Screens\ClothesType\ClothesTypeEditScreen;
+
+use App\Orchid\Screens\WeightClass\WeightClassListScreen;
 
 use App\Orchid\Screens\Options\RejectReasonListScreen;
 use App\Orchid\Screens\Options\PrivacyScreen;
 use App\Orchid\Screens\Options\StaticTextListScreen;
+use App\Orchid\Screens\Options\FaqScreen;
 
 /*
 |--------------------------------------------------------------------------
@@ -157,12 +160,16 @@ Route::screen('clients', ClientListScreen::class)->name('client.list');
 Route::screen('services', ServiceListScreen::class)->name('service.list');
 Route::screen('service/{service?}', ServiceEditScreen::class)->name('service.edit');
 
-Route::screen('weights', WeightClassListScreen::class)->name('weight.list');
 Route::screen('clothes', ClothesTypeListScreen::class)->name('clothes.list');
+Route::screen('cloth/{clothes?}', ClothesTypeEditScreen::class)->name('clothes.edit');
+
+Route::screen('weights', WeightClassListScreen::class)->name('weight.list');
+
 
 Route::screen('reasons', RejectReasonListScreen::class)->name('reason.list');
 Route::screen('privacy', PrivacyScreen::class)->name('privacy.list');
 Route::screen('statictext', StaticTextListScreen::class)->name('statictext.list');
+Route::screen('faq', FaqScreen::class)->name('faq.list');
 
 
 

@@ -22,7 +22,8 @@
     @stack('head')
 
     <meta name="turbo-root" content="{{  Dashboard::prefix() }}">
-    <meta name="dashboard-prefix" content="{{  Dashboard::prefix() }}">
+    <!--<meta name="dashboard-prefix" content="{{  Dashboard::prefix() }}"> -->
+    <meta name="dashboard-prefix" content="/cleaneasiest/public/admin/">
 
     @if(!config('platform.turbo.cache', false))
         <meta name="turbo-cache-control" content="no-cache">

@@ -89,6 +89,7 @@ class ServiceEditScreen extends Screen {
         
         return [
             'service' => $service,
+            'service_picture' => $service->picture, 
             'prices' =>  $this->prices
         ];
     }
@@ -116,10 +117,19 @@ class ServiceEditScreen extends Screen {
         return [
             Layout::rows([
                 Group::make([
-                    Picture::make('picture')
+                    /*
+                    Picture::make('service_picture')
                         ->title('Picture')
                         ->maxFileSize(8)
                         ->horizontal(),
+                    */
+                    Cropper::make('service_picture')
+                    ->title('Picture')
+                    ->width(300)
+                    ->height(300)
+                    ->maxFileSize(8)
+                    ->targetUrl()
+                    ->horizontal(),
                     
                     Input::make('service.name')
                         ->type('text')
@@ -164,8 +174,13 @@ class ServiceEditScreen extends Screen {
     public function createOrUpdate(Service $service, Request $request)    {
         $service->fill($request->get('service'))->save();
 
-        Alert::info('Servis je uspesno sacuvan');
+        if (!str_contains($request->service_picture, 'default'))
+            $file_location = explode('storage/', $request->service_picture)[1];
+            if (isset($file_location)) {
+                rename ('storage/' . $file_location, 'storage/images/services/' . $service->id . '.png');
+            }
 
+        Alert::info('Servis je uspesno sacuvan');
         return redirect()->route('service.list');
     }
     

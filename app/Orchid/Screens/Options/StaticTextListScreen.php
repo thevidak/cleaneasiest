@@ -18,8 +18,8 @@ use App\Models\Options;
 
 class StaticTextListScreen extends Screen
 {
-    public $name = 'StaticTextListScreen';
-    public $description = 'Detalji o servisu';
+    public $name = 'Statički tekstovi';
+    public $description = 'Tekstovi definisani u bazi, koji se dinamički učitavaju u aplikaciji';
 
     public function query(): array {
 
@@ -45,14 +45,13 @@ class StaticTextListScreen extends Screen
             Layout::rows([
                 Input::make('support_text.title')
                         ->title('Naslov:')
-                        ->placeholder('Enter full name')
-                        ->required()
-                        ->help('Please enter your full name'),
+                        ->required(),
                 TextArea::make('support_text.text')
+                    ->title('Tekst:')
+                    ->required()
                     ->rows(20),
-
-
-            ]),
+            ])
+            ->title('Tekst na stranici za podršku:'),
         ];
     }
 

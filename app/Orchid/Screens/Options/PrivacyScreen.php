@@ -19,7 +19,7 @@ use App\Models\Privacy;
 class PrivacyScreen extends Screen
 {
 
-    public $name = 'PrivacyScreen';
+    public $name = 'Politika Privatnosti';
 
 
     public function query(): array
@@ -46,7 +46,7 @@ class PrivacyScreen extends Screen
         return [
             Layout::rows([
                 Label::make('title')
-                        ->title('Politika Privatnosti:'),
+                        ->title('Tekst:'),
                 TextArea::make('privacy_text')
                     ->rows(40),
 
