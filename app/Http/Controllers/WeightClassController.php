@@ -14,7 +14,10 @@ class WeightClassController extends Controller
      */
     public function index()
     {
-        return WeightClass::all();
+        return response()->json([
+            'status' => 1,
+            'result' => WeightClass::all()
+        ]);
     }
 
     /**

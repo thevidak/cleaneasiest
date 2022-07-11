@@ -25,6 +25,7 @@ class CreateOrdersTable extends Migration
             $table->foreignId('address_id')->nullable();
             $table->foreignId('card_id')->nullable();
             
+            $table->string('phone')->nullable();
             $table->json('takeout_date')->nullable();
             $table->json('delivery_date')->nullable();
             $table->decimal('price');

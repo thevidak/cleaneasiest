@@ -5,7 +5,7 @@ function googleAPICalculateDistance($starting_location, $ending_location) {
         $start = $starting_location['latitude'] . "," . $starting_location['longitude'];
         $end = $ending_location['latitude'] . "," . $ending_location['longitude'];
 
-        $response = Http::get('https://maps.googleapis.com/maps/api/distancematrix/json', [
+        $response = Http::retry(3, 500)->get('https://maps.googleapis.com/maps/api/distancematrix/json', [
             'origins' => $start,
             'destinations' => $end,
             'key' => env('GOOGLE_API_KEY',false)
@@ -49,8 +49,8 @@ function googleAPIGetDistanceAndDurationFormated ($starting_location, $ending_lo
     ];
 }
 function googleAPIGetGeoLocationFromAddress ($address) {
-/*
-    $response = Http::get('https://maps.googleapis.com/maps/api/geocode/json', [
+
+    $response = Http::retry(3, 500)->get('https://maps.googleapis.com/maps/api/geocode/json', [
         'address' => $address,
         'sensor' => FALSE,
         'key' => env('GOOGLE_API_KEY',false)
@@ -62,11 +62,13 @@ function googleAPIGetGeoLocationFromAddress ($address) {
         "latitude" => $calulated_response->results[0]->geometry->location->lat,
         "longitude" => $calulated_response->results[0]->geometry->location->lng,
     ];
-*/
+
+    /*
     return [
         "latitude" => 44.813206,
         "longitude" => 20.42967,
     ];
+    */
 }
 
 function gFormatTime ($seconds) {

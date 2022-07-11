@@ -31,9 +31,11 @@ class OrderStalledListScreen extends Screen {
 
     public function commandBar(): array {
         return [
+            /*
             Link::make('Kreiraj novu')
                 ->icon('pencil')
                 ->route('order.edit')
+            */
         ];
     }
 

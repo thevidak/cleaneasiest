@@ -171,6 +171,3 @@ Route::screen('privacy', PrivacyScreen::class)->name('privacy.list');
 Route::screen('statictext', StaticTextListScreen::class)->name('statictext.list');
 Route::screen('faq', FaqScreen::class)->name('faq.list');
 
-
-
-

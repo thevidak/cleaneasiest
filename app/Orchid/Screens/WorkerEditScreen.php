@@ -19,6 +19,9 @@ use Orchid\Support\Color;
 use Orchid\Support\Facades\Layout;
 use Orchid\Support\Facades\Toast;
 
+use Orchid\Screen\Fields\Map;
+use Orchid\Screen\Fields\Input;
+
 use App\Models\Role;
 use App\Models\User;
 
@@ -43,6 +46,10 @@ class WorkerEditScreen extends Screen {
         return [
             'user'       => $user,
             'permission' => $user->getStatusPermission(),
+            'place' => [
+                'lat' => $user->location['latitude'],
+                'lng' => $user->location['longitude'],
+            ],
         ];
     }
 
@@ -64,17 +71,86 @@ class WorkerEditScreen extends Screen {
     public function layout(): array
     {
         return [
-
-            Layout::block(UserEditLayout::class)
-                ->title(__('Opste informacije'))
-                ->description(__('Opste informacije o serviseru, ove informacije vozac ne moze da menja samostalno'))
-                ->commands(
-                    Button::make(__('Sacuvaj'))
-                        ->type(Color::DEFAULT())
-                        ->icon('check')
-                        ->canSee($this->user->exists)
-                        ->method('save')
-                ),
+            Layout::block(
+                Layout::rows(
+                    [
+                        Input::make('user.name')
+                            ->type('text')
+                            ->max(255)
+                            ->required()
+                            ->title(__('Ime'))
+                            ->placeholder(__('Ime'))
+                        ,
+                        Input::make('user.surname')
+                            ->type('text')
+                            ->max(255)
+                            ->required()
+                            ->title(__('Prezime'))
+                            ->placeholder(__('Prezime'))
+                        ,
+                        Input::make('user.email')
+                            ->type('email')
+                            ->required()
+                            ->title(__('Email'))
+                            ->placeholder(__('Email'))
+                        ,
+                        Map::make('place')
+                            ->title('Lokacija Servisa')
+                        ,
+                        Input::make('user.country')
+                            ->type('text')
+                            ->max(255)
+                            ->required()
+                            ->title(__('Drzava'))
+                            ->placeholder(__('Drzava'))
+                        ,
+                        Input::make('user.address')
+                            ->type('text')
+                            ->max(255)
+                            ->required()
+                            ->title(__('Adresa'))
+                            ->placeholder(__('Adresa'))
+                        ,
+                        Input::make('user.city')
+                            ->type('text')
+                            ->max(255)
+                            ->required()
+                            ->title(__('Grad'))
+                            ->placeholder(__('Grad'))
+                        ,
+                        Input::make('user.municipality')
+                            ->type('text')
+                            ->max(255)
+                            ->required()
+                            ->title(__('Opstina'))
+                            ->placeholder(__('Opstina'))
+                        ,
+                        Input::make('user.zip')
+                            ->type('text')
+                            ->max(255)
+                            ->required()
+                            ->title(__('Postanski Broj'))
+                            ->placeholder(__('Postanski Broj'))
+                        ,
+                        Input::make('user.phone')
+                            ->type('text')
+                            ->max(255)
+                            ->required()
+                            ->title(__('Telefon'))
+                            ->placeholder(__('Telefon'))
+                        ,
+                    ]
+                )
+            )
+            ->title(__('Opste informacije'))
+            ->description(__('Opste informacije o serviseru, ove informacije vozac ne moze da menja samostalno'))
+            ->commands(
+                Button::make(__('Sacuvaj'))
+                    ->type(Color::DEFAULT())
+                    ->icon('check')
+                    ->canSee($this->user->exists)
+                    ->method('save')
+            ),
 
             Layout::block(UserPasswordLayout::class)
                 ->title(__('Sifra'))
@@ -86,6 +162,7 @@ class WorkerEditScreen extends Screen {
                         ->canSee($this->user->exists)
                         ->method('save')
                 ),
+            
 
         ];
     }
@@ -117,11 +194,14 @@ class WorkerEditScreen extends Screen {
                 'zip' => $request['user.zip'],
                 'phone' => $request['user.phone'],
                 'role_id' => Role::WORKER,
-                'location' => googleAPIGetGeoLocationFromAddress($request['user.address'] . ", " . $request['user.city'])
+                'location' => [
+                    'latitude' => $request['place.lat'],
+                    'longitude' =>$request['place.lng']
+                ]
             ]);
+
             
             Toast::info(__('Serviser je dodat.'));
-
             return redirect()->route('worker.list');
         }
 
@@ -130,17 +210,33 @@ class WorkerEditScreen extends Screen {
             $userData = $request->get('user');
             if ($user->exists && (string)$userData['password'] === '') {
                 // When updating existing user null password means "do not change current password"
-                unset($userData['password']);
+                //unset($userData['password']);
             } else {
-                $userData['password'] = Hash::make($userData['password']);
+                $user->password = bcrypt($request['user.password']);
+                //$userData['password'] = Hash::make($userData['password']);
             }
 
-            $user->fill($userData)->save();
+            $user->name = $request['user.name'];
+            $user->email = $request['user.email'];
+
+            $user->surname = $request['user.surname'];
+            $user->country = $request['user.country'];
+            $user->address = $request['user.address'];
+            $user->city = $request['user.city'];
+            $user->municipality = $request['user.municipality'];
+            $user->zip = $request['user.zip'];
+            $user->phone = $request['user.phone'];
+            $user->role_id = Role::WORKER;
+            $user->location = [
+                'latitude' => $request['place.lat'],
+                'longitude' =>$request['place.lng']
+            ];
+            $user->save();
+            //$user->location = googleAPIGetGeoLocationFromAddress($request['user.address'] . ", " . $request['user.city'])
+
 
             Toast::info(__('Serviser je sacuvan.'));
-            
             return redirect()->route('worker.list');
-            
         }
     }
 

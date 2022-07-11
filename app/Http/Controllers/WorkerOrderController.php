@@ -18,6 +18,7 @@ use App\Models\Faq;
 use App\Models\Privacy;
 use App\Models\ClientQuestion;
 use App\Models\ClientInfo;
+use App\Models\Address;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -65,7 +66,13 @@ class WorkerOrderController extends Controller{
         $new_orders_count = count($pending_orders);
         $accepted_orders_count = Order::where('worker_id', Auth::id())->where('status', '!=', OrderStatus::ORDER_DELIVERED)->count();
 
-        if ($new_orders_count == 0 && $accepted_orders_count == 0) { return response()->json(["status" => 0, "errorMessage" => 'No orders']);}
+        if ($new_orders_count == 0 && $accepted_orders_count == 0) {
+            return response()->json([
+                "status" => 1, 
+                "newOrders" => 0, 
+                "acceptedOrders" => 0
+            ]);
+        }
 
         // if the order timer is passed we do not show it
         
@@ -108,11 +115,11 @@ class WorkerOrderController extends Controller{
                 }
             }
         }
-
-        if ($pending_orders->isEmpty()) {return response()->json(["status" => 0, "errorMessage" => "No new orders"]);}
+        $result = [];
+        if ($pending_orders->isEmpty()) return response()->json(["status" => 1, "result" => $result]);
 
         
-        $result = [];
+        
         foreach ($pending_orders as $order) {
             $takeout_datetime = $order->getDateTime('takeout', 'end');
             //$takeout_datetime = new \DateTime($order->takeout_date["date"] . " " . $order->takeout_date["end_time"]);
@@ -137,7 +144,7 @@ class WorkerOrderController extends Controller{
             }
         }
 
-        if (empty($result)) { return response()->json(["status" => 0, "errorMessage" => "No new orders"]);}
+        if (empty($result)) return response()->json(["status" => 1, "result" => $result]);
 
         return response()->json([
             "status" => 1,
@@ -185,7 +192,8 @@ class WorkerOrderController extends Controller{
         $destinations = "";
         $new_orders = Order::where('worker_id',Auth::id())->where('status', '!=', OrderStatus::ORDER_DELIVERED)->get();
 
-        if ($new_orders->isEmpty()) return response()->json(["status" => 0, "errorMessage" => "No new orders"]);
+        $result = [];
+        if ($new_orders->isEmpty()) return response()->json(["status" => 1, "result" => $result]);
 
         // caluclating time for all orders in one call
 
@@ -218,7 +226,7 @@ class WorkerOrderController extends Controller{
         }
         */
 
-        $result = [];
+        
         
         foreach ($new_orders as $order) {
             $takeout_datetime = $order->getDateTime('delivery', 'end');
@@ -246,11 +254,16 @@ class WorkerOrderController extends Controller{
         $request->validate(['jbp' => 'required']);
         $order = Order::where('id',$request->jbp)->first();
 
-        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Order unavailable"]);
+        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Nedostupna narudzbina"]);
 
         $services = $order->services;
 
         $service_list_prep = [];
+
+        $is_ready = FALSE;
+        if ($order->status == OrderStatus::WORKER_FINISHED) {
+            $is_ready = TRUE;
+        }
 
         foreach ($services as $single_service) {
             $service = Service::where('id',$single_service['service_id'])->first();
@@ -280,7 +293,8 @@ class WorkerOrderController extends Controller{
             "services" => $service_list_prep,
             "subservices" => $order->subserviceList,
             "deliveryDate" => isset($order->delivery_date) ? $order->delivery_date : NULL,
-            "takeoutDate" => isset($order->takeout_date) ? $order->takeout_date : NULL
+            "takeoutDate" => isset($order->takeout_date) ? $order->takeout_date : NULL,
+            "isReady" => $is_ready
             //"clientDate" => $order->delivery_date["date"],
             //"clientTime" => $order->delivery_date["start_time"]. "-" . $order->delivery_date["end_time"]
         ]);
@@ -290,13 +304,13 @@ class WorkerOrderController extends Controller{
         $request->validate(['jbp' => 'required', 'serviceAccepted' => 'required']);
         $order = Order::where('id',$request->jbp)->first();
 
-        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Order unavailable"]);
+        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Nedostupna narudzbina"]);
 
         if ($request->serviceAccepted == FALSE) {
             if (isset($order) && $order->status == OrderStatus::ORDER_CREATED) {
                 $rejected_order = RejectedOrders::where('order_id',$order->id)->where('user_id', Auth::id())->first();
                 if (isset($rejected_order)) {
-                    return response()->json(["status" => 0, "errorMessage" => "Order Already Rejected"]);
+                    return response()->json(["status" => 0, "errorMessage" => "Narudzbina vec odbijena"]);
                 }
 
                 RejectedOrders::create([
@@ -309,15 +323,26 @@ class WorkerOrderController extends Controller{
                 ]);
             }
             else {
-                return response()->json(["status" => 0, "errorMessage" => "Order Not Rejected"]);
+                return response()->json(["status" => 0, "errorMessage" => "Narudzbina nije odbijena"]);
             }
         }
         else {
             if ($order->status == OrderStatus::ORDER_CREATED) {
-                if (!isset($request->deliveryDate)) return response()->json(["status" => 0, "errorMessage" => "Datum dostave nije izabran."]);
+                $delivery_date = NULL;
+                if (!isset($request->deliveryDate)) {
+                    //return response()->json(["status" => 0, "errorMessage" => "Datum dostave nije izabran."]);
+                    $delivery_date = [
+                        'date' => \DateTime::createFromFormat('d-m-Y', $order->takeout_date['date'])->add(\DateInterval::createFromDateString('1 day'))->format('d-m-Y'),
+                        'start_time' =>$order->takeout_date['start_time'],
+                        'end_time' =>$order->takeout_date['end_time'], 
+                    ];
+                }
+                else {
+                    $delivery_date = $request->deliveryDate;
+                }
                 $order->status = OrderStatus::WORKER_ACCEPTED;
                 $order->worker_id = Auth::id();
-                $order->delivery_date = $request->deliveryDate;
+                $order->delivery_date = $delivery_date;
                 $order->save();
                 return response()->json([
                     "status" => 1
@@ -334,7 +359,7 @@ class WorkerOrderController extends Controller{
         $request->validate(['jbp' => 'required']);
 
         $order = Order::where('id',$request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Order unavailable"]);
+        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Nedostupna narudzbina"]);
         
         $remaining_time = 0;
         $driver = $order->driver_id == NULL ? NULL : User::where('id',$order->driver_id)->first();
@@ -390,10 +415,10 @@ class WorkerOrderController extends Controller{
     public function workerLoadAcceptedOrderMap(Request $request) {
         $request->validate(['jbp' => 'required']);
         $order = Order::where('id',$request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Order unavailable"]);
+        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Nedostupna narudzbina"]);
 
         $driver = $order->driver_id == NULL ? NULL : User::where('id',$order->driver_id)->first();
-        if (!isset($driver)) return response()->json(["status" => 0,"errorMessage" => "Order has no asigned driver"]);
+        if (!isset($driver)) return response()->json(["status" => 0,"errorMessage" => "Narudzbina nema dodeljenog vozaca"]);
 
         return response()->json([
             'status' => 1,
@@ -406,7 +431,7 @@ class WorkerOrderController extends Controller{
         $request->validate(['jbp' => 'required', 'isLoaded' => 'required']);
 
         $order = Order::where('id',$request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Order unavailable"]);
+        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Nedostupna narudzbina"]);
 
         if ($request->isLoaded == TRUE) {
             if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER) {
@@ -418,14 +443,14 @@ class WorkerOrderController extends Controller{
             }
         }
 
-        return response()->json(["status" => 0, "errorMessage" => "Error loading the order"]); 
+        return response()->json(["status" => 0, "errorMessage" => "Greska"]); 
     }
 
     public function workerSetDeliveredAcceptedOrder (Request $request) {
         $request->validate(['jbp' => 'required', 'isDelivered' => 'required']);
 
         $order = Order::where('id',$request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
+        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Nedostupna narudzbina"]);
 
         if ($request->isDelivered == TRUE) {
             if ($order->status == OrderStatus::WORKER_FINISHED) {
@@ -439,7 +464,7 @@ class WorkerOrderController extends Controller{
 
         return response()->json([
             "status" => 0,
-            "errorMessage" => "Error delivering the order"
+            "errorMessage" => "Greska"
         ]); 
     }
 
@@ -447,7 +472,7 @@ class WorkerOrderController extends Controller{
         $request->validate(['jbp' => 'required']);
 
         $order = Order::where('id',$request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
+        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Nedostupna narudzbina"]);
 
         if ($order->status == OrderStatus::WORKER_PROCESSING) {
             $order->status = OrderStatus::WORKER_FINISHED;
@@ -457,14 +482,20 @@ class WorkerOrderController extends Controller{
             ]);
         }
 
-        return response()->json(["status" => 0, "errorMessage" => "Error"]); 
+        return response()->json(["status" => 0, "errorMessage" => "Greska"]); 
     }
 
     public function workerGetOrderStatus (Request $request) {
         $request->validate(['jbp' => 'required']);
 
         $order = Order::where('id',$request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
+        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Narudzbina nedostupna"]);
+
+        $order_address = Address::where('id', $order->address_id)->first();
+        $order_location = [
+            'latitude' => $order_address->latitude,
+            'longitude' => $order_address->longitude
+        ];
 
         $driver = User::where('id', $order->driver_id)->first();
 
@@ -500,7 +531,7 @@ class WorkerOrderController extends Controller{
                     "orderStatus" => 'preuzimanje',
                     //"remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),  
                     "remainingTime" =>$this->formatTime(
-                        googleAPIGetTimeRemainingInSeconds($driver->location, $order->order_info['location']) + 
+                        googleAPIGetTimeRemainingInSeconds($driver->location, $order_location) + 
                         googleAPIGetTimeRemainingInSeconds($driver->location, Auth::user()->location)),
                     //"serviceDate" => $order->getDateTime('takeout', 'end')->format("Y-m-d"),
                     //"serviceTime" => $order->getDateTime('takeout', 'end')->format("H:i"),
@@ -536,8 +567,8 @@ class WorkerOrderController extends Controller{
                     "status" => 1,
                     "orderStatus" => 'usluga',
                     "serviceFinished" => true,
-                    //"remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),
-                    "remainingTime" => 0,
+                    "remainingTime" => $this->timeDifference($order->getDateTime('delivery', 'end'),$now),
+                    //"remainingTime" => 0,
                     "deliveryDate" => $order->getDateTime('delivery', 'end')->format("d-m-Y"),
                     "deliveryTime" => $order->getDateTime('delivery', 'end')->format("H:i"),
                 ]);
@@ -549,7 +580,7 @@ class WorkerOrderController extends Controller{
                     //"remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),
                     "remainingTime" =>$this->formatTime(
                         googleAPIGetTimeRemainingInSeconds($driver->location, Auth::user()->location) + 
-                        googleAPIGetTimeRemainingInSeconds(Auth::user()->location, $order->order_info['location'])),
+                        googleAPIGetTimeRemainingInSeconds(Auth::user()->location, $order_location)),
                 ]);
                 break;
             case OrderStatus::DRIVER_DELIVERY_TO_CLIENT:
@@ -558,7 +589,7 @@ class WorkerOrderController extends Controller{
                     "orderStatus" => 'dostava',
                     //"remainingTime" => $this->timeDifference($order->getDateTime('takeout', 'end'),$now),
                     "remainingTime" =>$this->formatTime(
-                        googleAPIGetTimeRemainingInSeconds($driver->location, $order->order_info['location'])),
+                        googleAPIGetTimeRemainingInSeconds($driver->location, $order_location)),
                 ]);
                 break;
             case OrderStatus::ORDER_DELIVERED:
@@ -568,7 +599,7 @@ class WorkerOrderController extends Controller{
                 ]);
                 break;
             default:
-                return response()->json(["status" => 0, "errorMessage" => "Order status unavailable"]);
+                return response()->json(["status" => 0, "errorMessage" => "Status Narudzbine nedostupan"]);
                 break;
         }
     }
@@ -588,16 +619,22 @@ class WorkerOrderController extends Controller{
         $request->validate(['jbp' => 'required']);
 
         $order = Order::where('id',$request->jbp)->where('worker_id',Auth::id())->first();
-        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Order unavailable"]);
+        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Narudzbina nedostupna"]);
         
         $remaining_time = 0;
         $driver = $order->driver_id == NULL ? NULL : User::where('id',$order->driver_id)->first();
 
         $worker_location = Auth::user()->location;
+        if (!isset($worker_location)) $worker_location = ['latitude' => Auth::user()->activeAddress->latitude, 'longitude' => Auth::user()->activeAddress->longitude];
         $driver_location = isset($driver) ? $driver->location : NULL;
-        $client_location = User::where('id',$order->client_id)->first()->location;
+        //$client_location = User::where('id',$order->client_id)->first()->location;
+        $order_address = Address::where('id', $order->address_id)->first();
+        $client_location = [
+            'latitude' => $order_address->latitude,
+            'longitude' => $order_address->longitude
+        ];
 
-        $acceptedStatus = NULL;
+        $show_prompt = FALSE;
         $order_status = NULL;
 
         // this api is called only during delivery and takeout
@@ -605,44 +642,40 @@ class WorkerOrderController extends Controller{
             case OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT:
                 //$remaining_time = $this->calculateDistance($driver_location,$client_location)->value + 300 + $this->calculateDistance($client_location,$worker_location)->value;
                 $remaining_time = $this->formatTime(
-                    googleAPIGetTimeRemainingInSeconds($driver->location, $order->order_info['location']) + 
-                    googleAPIGetTimeRemainingInSeconds($driver->location, Auth::user()->location));
+                    googleAPIGetTimeRemainingInSeconds($driver_location,  $client_location) + 
+                    googleAPIGetTimeRemainingInSeconds($driver_location, $worker_location));
                 $order_status = 'preuzimanje';
                 break;
             case OrderStatus::DRIVER_DELIVERY_TO_WORKER:
-                //$remaining_time = $this->calculateDistance($driver_location,$worker_location)->value;
-                $remainingTime =$this->formatTime(
-                    googleAPIGetTimeRemainingInSeconds($driver->location, Auth::user()->location));
+               $remaining_time =$this->formatTime(googleAPIGetTimeRemainingInSeconds($driver_location, $worker_location));
                 $order_status = 'preuzimanje';
+                $show_prompt = TRUE;
                 break;
             case OrderStatus::DRIVER_TAKEOUT_FROM_WORKER:
                 # time from driver to worker
                 //$remaining_time = $this->calculateDistance($driver_location,$worker_location)->value;
                 $remaining_time = $this->formatTime(
-                    googleAPIGetTimeRemainingInSeconds($driver->location, Auth::user()->location) + 
-                    googleAPIGetTimeRemainingInSeconds(Auth::user()->location, $order->order_info['location']));
+                    googleAPIGetTimeRemainingInSeconds($driver_location, $worker_location) + 
+                    googleAPIGetTimeRemainingInSeconds($worker_location, $client_location));
                 $order_status = 'dostava';
+                $show_prompt = TRUE;
                 break;
             case OrderStatus::DRIVER_DELIVERY_TO_CLIENT:
                 # time from driver to client
                 //$remaining_time = $this->calculateDistance($driver_location,$client_location)->value;
                 $remaining_time = $this->formatTime(
-                    googleAPIGetTimeRemainingInSeconds($driver->location, $order->order_info['location']));
+                    googleAPIGetTimeRemainingInSeconds($driver_location, $client_location));
                 $order_status = 'dostava';
                 break;
 
             case OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT:
                 # time unavailable
-                $acceptedStatus = NULL;
             case OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT:
                 # time unavailable
-                $acceptedStatus = NULL;
             case OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER:
                 # time unavailable
-                $acceptedStatus = NULL;
             case OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER:
                 # time unavailable
-                $acceptedStatus = NULL;
                 break;
             default:
                 # nothing
@@ -656,9 +689,11 @@ class WorkerOrderController extends Controller{
             "driverName" => isset($driver) ? $driver->name . " " . $driver->surname : NULL,
             "driverPhone" => isset($driver) ? $driver->phone : NULL,
             "licencePlate" => isset($driver) ? $driver->profile->licence_plate : NULL,
-            "acceptedStatus" => $acceptedStatus,
+            "showPrompt" => $show_prompt,
             "driverLatitude" => isset($driver) ? $driver->location['latitude'] : NULL,
-            "driverLongitude" => isset($driver) ? $driver->location['longitude'] : NULL
+            "driverLongitude" => isset($driver) ? $driver->location['longitude'] : NULL,
+            "workerLatitude" => $worker_location['latitude'],
+            "workerLongitude" => $worker_location['longitude']
         ]);
     }
 
@@ -668,7 +703,7 @@ class WorkerOrderController extends Controller{
         $note = isset($request->note) ? $request->note : NULL;
 
         $order = Order::where('id',$request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Order unavailable"]);
+        if (!isset($order)) return response()->json(["status" => 0, "errorMessage" => "Nedostupna narudzbina"]);
 
         switch ($request->type) {
             case 'load' :
@@ -712,16 +747,16 @@ class WorkerOrderController extends Controller{
                 break;
             default :
                 // unknown type
-                return response()->json(["status" => 0, "errorMessage" => "Type unrecognized"]); 
+                return response()->json(["status" => 0, "errorMessage" => "Nepoznat Tip"]); 
                 break;
         }
 
-        return response()->json(["status" => 0, "errorMessage" => "Error changing the order status"]); 
+        return response()->json(["status" => 0, "errorMessage" => "Greska"]); 
     }
 
        
 
-
+    
     public function workerGetCurentOrders() {
         return Order::where('worker_id', Auth::id())->get();
         /*
@@ -743,6 +778,7 @@ class WorkerOrderController extends Controller{
         return $result;
         */
     }
+    
 
     public function workerGetPendingOrders() {
         $rejected_orders = RejectedOrders::where('worker_id',Auth::id())->get();
@@ -761,6 +797,7 @@ class WorkerOrderController extends Controller{
         return $pending_orders;
     }
 
+    /*
     public function workerAcceptOrder (Request $request) {
         $request->validate([
             'order_id' => 'required'
@@ -782,7 +819,8 @@ class WorkerOrderController extends Controller{
             ]);
         }
     }
-
+    */
+    /*
     public function workerRejectOrder (Request $request) {
         $request->validate([
             'order_id' => 'required'
@@ -809,7 +847,8 @@ class WorkerOrderController extends Controller{
             ]);
         }
     }
-
+    */
+    /*
     public function workerOrderReady (Request $request, $id) {
         Order::where('id',$id)->update(['status' => OrderStatus::WORKER_FINISHED]);
         return response()->json([
@@ -817,6 +856,6 @@ class WorkerOrderController extends Controller{
             "message" => "Order Ready"
         ]);
     }
-
+    */
     
 }

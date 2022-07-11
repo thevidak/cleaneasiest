@@ -18,6 +18,7 @@ use App\Models\Faq;
 use App\Models\Privacy;
 use App\Models\ClientQuestion;
 use App\Models\ClientInfo;
+use App\Models\Address;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -70,7 +71,6 @@ class DriverOrderController extends Controller{
 
 
     public function driverGetNumberOfTotalOrders (Request $request) {
-        
         $rejected_orders = RejectedOrders::where('user_id', Auth::id())->get();
         $pending_orders = Order::where('status',OrderStatus::WORKER_ACCEPTED)
             ->orWhere('status',OrderStatus::WORKER_FINISHED)->get();
@@ -84,15 +84,13 @@ class DriverOrderController extends Controller{
                 }
             }
         }
-
         $new_orders_count = count($pending_orders);
-        //$accepted_orders_count = Order::where('driver_id', Auth::id())->count();
         $accepted_orders_count = Order::where('driver_id',Auth::id())
             ->where('status', '!=', OrderStatus::WORKER_PROCESSING)
             ->where('status', '!=', OrderStatus::ORDER_DELIVERED)
             ->where('status', '!=', OrderStatus::WORKER_FINISHED)->count();
 
-        if ($new_orders_count == 0 && $accepted_orders_count == 0) return response()->json(["status" => 0, "errorMessage" => "No orders avalable"]);
+        //if ($new_orders_count == 0 && $accepted_orders_count == 0) return response()->json(["status" => 0, "errorMessage" => "No orders avalable"]);
 
         return response()->json([
             'status' => 1,
@@ -103,7 +101,6 @@ class DriverOrderController extends Controller{
 
     public function driverGetListOfNewOrders() {
         $driver = Auth::user();
-
         $rejected_orders = RejectedOrders::where('user_id', Auth::id())->get();
         $pending_orders = Order::where('status',OrderStatus::WORKER_ACCEPTED)
             ->orWhere('status',OrderStatus::WORKER_FINISHED)->get();
@@ -117,12 +114,12 @@ class DriverOrderController extends Controller{
                 }
             }
         }
-
-        if ($pending_orders->isEmpty()) {return response()->json(["status" => 0, "errorMessage" => "No new orders"]);}
+        $result = [];
+        if ($pending_orders->isEmpty()) {return response()->json(["status" => 1, 'result' => $result]);}
 
         $destinations = "";
 
-        $result = [];
+        
         $now = new \DateTime();
 
         foreach ($pending_orders as $order) {
@@ -150,8 +147,9 @@ class DriverOrderController extends Controller{
             ->where('status', '!=', OrderStatus::ORDER_DELIVERED)
             ->where('status', '!=', OrderStatus::WORKER_FINISHED)->get();
 
+        $result = [];
         if ($new_orders->isEmpty()) {
-            return response()->json(["status" => 0, "errorMessage" => "No new orders"]);
+            return response()->json(["status" => 1, 'result' => $result]);
         }
 
         foreach ($new_orders as $order) {
@@ -168,7 +166,7 @@ class DriverOrderController extends Controller{
 
         $calulated_distances = json_decode($order_info->body());
 
-        $result = [];
+        
         $counter = 0;
         
         foreach ($new_orders as $order) {
@@ -197,10 +195,26 @@ class DriverOrderController extends Controller{
         $request->validate(['jbp' => 'required']);
 
         $order = Order::where('id',$request->jbp)->where('driver_id',Auth::id())->first();
-        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
+        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Narudzbina nedostupna"]);
 
+        $driver = Auth::user();
         $client = User::where('id', $order->client_id)->first();
         $worker = User::where('id', $order->worker_id)->first();
+
+        $note = isset($order->order_info['note']) ? $order->order_info['note'] : '';
+        $order_address = Address::where('id', $order->address_id)->first();
+        $order_location = [
+            'latitude' => $order_address->latitude,
+            'longitude' => $order_address->longitude
+        ];
+        // if driver location is set update it
+        if (isset($request->driverLatitude) && isset($request->driverLongitude)) {
+            $driver->location = [
+                'latitude' => $request->driverLatitude,
+                'longitude' => $request->driverLongitude
+            ];
+            $driver->save();
+        }
 
         switch ($order->status) {
             case OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT:
@@ -209,11 +223,12 @@ class DriverOrderController extends Controller{
                     'orderStatus' => 'preuzimanje',
                     'type' => 'takeout',
                     'target' => [
-                        'address' => $order->order_info['address'],
-                        'distance' => googleAPIGetDistanceAndDurationFormated(Auth::user()->location, $order->order_info['location']),
+                        'address' => $order_address->text,
+                        'note' => $note,
+                        'distance' => googleAPIGetDistanceAndDurationFormated($driver->location, $order_location),
                         'name' => $client->name . ' ' . $client->surname,
-                        'phone' => $client->phone,
-                        'location' => $order->order_info['location']
+                        'phone' => $order->phoneNumber,
+                        'location' => $order_location
                     ]
                 ]);
                 break;
@@ -224,7 +239,8 @@ class DriverOrderController extends Controller{
                     'type' => 'takeout',
                     'target' => [
                         'address' => $worker->address,
-                        'distance' => googleAPIGetDistanceAndDurationFormated(Auth::user()->location, $worker->location),
+                        //'note' => $worker->address->note,
+                        'distance' => googleAPIGetDistanceAndDurationFormated($driver->location, $worker->location),
                         'name' => $worker->name . ' ' . $worker->surname,
                         'phone' => $worker->phone,
                         'location' => $worker->location
@@ -239,7 +255,8 @@ class DriverOrderController extends Controller{
                     'type' => 'delivery',
                     'target' => [
                         'address' => $worker->address,
-                        'distance' => googleAPIGetDistanceAndDurationFormated(Auth::user()->location, $worker->location),
+                        //'note' => $note,
+                        'distance' => googleAPIGetDistanceAndDurationFormated($driver->location, $worker->location),
                         'name' => $worker->name . ' ' . $worker->surname,
                         'phone' => $worker->phone,
                         'location' => $worker->location
@@ -252,16 +269,17 @@ class DriverOrderController extends Controller{
                     'orderStatus' => 'isporuka',
                     'type' => 'delivery',
                     'target' => [
-                        'address' => $order->order_info['address'],
-                        'distance' => googleAPIGetDistanceAndDurationFormated(Auth::user()->location, $order->order_info['location']),
+                        'address' => $order_address->text,
+                        'note' => $note,
+                        'distance' => googleAPIGetDistanceAndDurationFormated($driver->location, $order_location),
                         'name' => $client->name . ' ' . $client->surname,
-                        'phone' => $client->phone,
-                        'location' => $order->order_info['location']
+                        'phone' => $order->phoneNumber,
+                        'location' => $order_location
                     ]
                 ]);
                 break;
 
-
+            // this need checking
             case OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT:
                 return response()->json([
                     'status' => 1,
@@ -274,7 +292,7 @@ class DriverOrderController extends Controller{
             default:
                 return response()->json([
                     'status' => 0,
-                    "errorMessage" => 'order unavailable'
+                    "errorMessage" => 'Narudzbina Nedostupna'
                 ]);
                 break;
         }
@@ -284,7 +302,7 @@ class DriverOrderController extends Controller{
     public function driverAcceptOrder(Request $request) {
         $request->validate(['jbp' => 'required', 'orderAccepted' => 'required']);
         $order = Order::where('id',$request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
+        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Narudzbina Nedostupna"]);
 
         if ($request->orderAccepted == TRUE) {
             if ($order->status == OrderStatus::WORKER_ACCEPTED) {
@@ -306,7 +324,7 @@ class DriverOrderController extends Controller{
             else {
                 return response()->json([
                     "status" => 0,
-                    "errorMessage" => "Cannot accept order"
+                    "errorMessage" => "Greska"
                 ]);
             }
         }
@@ -316,7 +334,7 @@ class DriverOrderController extends Controller{
             if (isset($rejected_order)) {
                 return response()->json([
                     "status" => 0,
-                    "errorMessage" => "Order Already Rejected"
+                    "errorMessage" => "Greska"
                 ]);
             }
 
@@ -344,7 +362,7 @@ class DriverOrderController extends Controller{
         $request->validate(['jbp' => 'required', 'driverLatitude' => 'required', 'driverLongitude' => 'required']);
 
         $order = Order::where('id',$request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
+        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Narudzbina Nedostupna"]);
 
         if ($order->status != OrderStatus::WORKER_ACCEPTED && $order->status != OrderStatus::WORKER_FINISHED) {
             return response()->json(["status" => 0,"errorMessage" => "Narudzbina nedostupna"]);
@@ -364,9 +382,10 @@ class DriverOrderController extends Controller{
             'type' => $order->status == OrderStatus::WORKER_ACCEPTED ? 'preuzimanje' : 'dostava',
             'client' => [
                 'address' => $order->order_info['address'],
+                'note' => isset($order->order_info['note']) ? $order->order_info['note'] : '',
                 'distance' => googleAPIGetDistanceAndDurationFormated(Auth::user()->location, $order->order_info['location']),
                 'name' => $client->name . " " . $client->surname,
-                'phone' => $client->phone
+                'phone' => $order->phoneNumber
             ],
             'worker' => [
                 'address' => $worker->address,
@@ -381,7 +400,7 @@ class DriverOrderController extends Controller{
         $request->validate(['jbp' => 'required', 'isLoaded' => 'required']);
 
         $order = Order::where('id',$request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
+        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Narudzbina Nedostupna"]);
 
         if ($request->isLoaded == TRUE) {
             if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT || $order->status == OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT) {
@@ -408,14 +427,14 @@ class DriverOrderController extends Controller{
             ]);
         }
 
-        return response()->json(["status" => 0, "errorMessage" => "Order invalid"]); 
+        return response()->json(["status" => 0, "errorMessage" => "Narudzbina Nedostupna"]); 
     }
 
     public function driverSetDeliveredToWorkerAcceptedOrder (Request $request) {
         $request->validate(['jbp' => 'required', 'isDelivered' => 'required']);
 
         $order = Order::where('id',$request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
+        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Narudzbina Nedostupna"]);
 
         if ($request->isDelivered == TRUE) {
             if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER || $order->status == OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER) {
@@ -529,8 +548,9 @@ class DriverOrderController extends Controller{
         $request->validate(['jbp' => 'required', 'driverLatitude' => 'required', 'driverLongitude' => 'required']);
 
         $order = Order::where('id',$request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
+        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Nedostupna porudzbina"]);
 
+        $driver = Auth::user();
         $client = User::where("id",$order->client_id)->first();
         $worker = User::where("id",$order->worker_id)->first();
 
@@ -538,7 +558,18 @@ class DriverOrderController extends Controller{
             "latitude" => $request->driverLatitude,
             "longitude" => $request->driverLongitude
         ];
-        $client_location = $client->location;
+
+        $driver->location = $driver_location;
+        $driver->save();
+         
+        
+        $client_address = Address::where('id',$order->address_id)->first();
+
+        $client_location = [
+            'latitude' => $client_address->latitude,
+            'longitude' => $client_address->longitude
+        ];
+
         $worker_location = $worker->location;
 
         $now = new \DateTime();
@@ -627,10 +658,11 @@ class DriverOrderController extends Controller{
                 "type" => $type,
                 "remainingTime" => $delivery_time != null ? $delivery_time : $duration,
                 "clientName" => $client->name . " " . $client->surname,
-                "clientPhone" => $client->phone,
-                "clientAddress" => $client->address . ", " . $client->city,
-                "clientLatitude" => $client->location["latitude"],
-                "clientLongitude" => $client->location["longitude"],
+                "clientPhone" => $order->phoneNumber,
+                "clientAddress" => $client_address->text,
+                "note" => isset($order->order_info['note']) ? $order->order_info['note'] : '',
+                "clientLatitude" => $client_location["latitude"],
+                "clientLongitude" => $client_location["longitude"],
                 "distance" => $distance,
                 'acceptedStatus' => $acceptedStatus
             ]); 
@@ -643,6 +675,7 @@ class DriverOrderController extends Controller{
                 "clientName" => $worker->name . " " . $client->surname,
                 "clientPhone" => $worker->phone,
                 "clientAddress" => $worker->address . ", " . $client->city,
+                "note" =>  '',
                 "clientLatitude" => $worker->location["latitude"],
                 "clientLongitude" => $worker->location["longitude"],
                 "distance" => $distance,

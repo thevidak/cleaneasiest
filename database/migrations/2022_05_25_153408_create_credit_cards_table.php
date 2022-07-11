@@ -17,6 +17,7 @@ class CreateCreditCardsTable extends Migration
             $table->id();
             $table->foreignId('user_id');
             $table->string('number');
+            $table->string('date');
             $table->boolean('active')->default(false);
             $table->boolean('enabled')->default(true);
             $table->timestamps();

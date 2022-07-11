@@ -38,7 +38,7 @@ class Order extends Model
 {
     use HasFactory, AsSource, Filterable;
 
-    protected $fillable = ['status', 'client_id', 'services', 'client_id', 'order_info', 'payment_info', 'takeout_date', 'delivery_date', 'price', 'address_id', 'card_id'];
+    protected $fillable = ['status', 'client_id', 'services', 'client_id', 'order_info', 'payment_info', 'takeout_date', 'delivery_date', 'price', 'address_id', 'card_id', 'phone'];
 
     protected $casts = [
         'services' => 'array',
@@ -59,10 +59,16 @@ class Order extends Model
         'updated_at'
     ];
 
-
-
     public function subservices() {
         return $this->hasMany(SubService::class);
+    }
+
+    public function address() {
+        return $this->hasOne(Address::class);
+    }
+
+    public function card() {
+        return $this->hasOne(CreditCard::class);
     }
 
     // calculate price for the existing order, using info from the services field and saves it
@@ -115,6 +121,10 @@ class Order extends Model
     /*********************************************************************************************************************************************************
                                                                             ATTRIBUTES
     *********************************************************************************************************************************************************/
+
+    public function getPhoneNumberAttribute () {
+        return isset($this->phone) ? $this->phone : User::where('id',$this->client_id)->first()->phone;
+    }
 
     public function getProgressAttribute() {
         $progress = 0;
@@ -377,4 +387,5 @@ class Order extends Model
         return '<div>123</div>';
         return json_encode($this->services);
     }
+
 }

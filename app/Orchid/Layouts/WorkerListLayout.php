@@ -30,7 +30,7 @@ class WorkerListLayout extends Table {
                 //->filter(Input::make())
                 ->render(function (User $user) {
                     return Link::make($user->fullName)
-                        ->route('driver.edit', $user);
+                        ->route('worker.edit', $user);
                 }),
 
             TD::make('email', __('Email'))

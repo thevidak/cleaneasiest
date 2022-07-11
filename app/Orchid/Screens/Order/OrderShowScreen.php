@@ -24,7 +24,11 @@ use App\Models\Order;
 use App\Models\User;
 use App\Models\Service;
 use App\Models\WeightClass;
+use App\Models\ClothesType;
 use App\Models\ServiceType;
+use App\Models\SubService;
+
+
 
 class OrderShowScreen extends Screen {
 
@@ -35,30 +39,9 @@ class OrderShowScreen extends Screen {
     public $description = 'Detalji o narudzbini';
     
     public function query(Order $order): array {
-        $services = [];
-        foreach ($order->services as $service_group) {
-            $service_id = $service_group["service_id"];
-            $service_type = Service::where('id',$service_id)->first()->type;
-            if ($service_type == ServiceType::WEIGHTABLE) {
-                $weight_class_id = $service_group["weight_class_id"];
-                $services[] = [
-                    'name' => Service::where('id',$service_id)->first()->name,
-                    'weight' => WeightClass::where('id',$weight_class_id)->first()->name,
-                ];
-            }
-            else if ($service_type == ServiceType::COUNTABLE) {
-                $clothes = $service_group["clothes"];
-                
-                $services[] = [
-                    'name' => Service::where('id',$service_id)->first()->name,
-                    'weight' => "123",
-                ];
-            }
-        }
-
         return [
             'order' => $order,
-            'services' => $services,
+            'subservices' => $order->subservices,
             'status' => $this->returnStatus($order->status),
             'client' => [
                 'id' =>$order->client_id,
@@ -79,63 +62,75 @@ class OrderShowScreen extends Screen {
 
     public function commandBar(): array
     {
+        
         return [
+            /*
             Button::make('Izmeni')
                 ->icon('trash')
                 ->method('remove'),
+            */
         ];
+        
     }
 
     public function layout(): array
     {
         return [
-            Layout::rows([
-                Label::make('status')
-                    ->title('Status')
-                    ->horizontal(),
-                Label::make('client.name')
-                    ->title('Klijent')
-                    ->horizontal(),
-                Label::make('worker.name')
-                    ->title('Serviser')
-                    ->horizontal(),
-                Label::make('driver.name')
-                    ->title('Vozač')
-                    ->horizontal(),
-                Label::make('order.created_at')
-                    ->title('Datum kreiranja')
-                    ->horizontal(),
-                Label::make('order.updated_at')
-                    ->title('Datum poslednje promene')
-                    ->horizontal(),
-                Label::make('order.price')
-                    ->title('Cena')
-                    ->horizontal(),
-                Label::make('takeout_data')
-                    ->title('Datum Preuzimanja')
-                    ->horizontal(),
-                Label::make('delivery_data')
-                    ->title('Datum Isporuke')
-                    ->horizontal(),
-                /*Matrix::make('services')
-                    ->columns([
-                        'name',
-                        'weight'
-                    ])
-                    ->fields([
-                        'name'   => Label::make(),
-                        'weight' => Label::make(),
-                    ])
-                    ->maxRows(5),*/
-                
-                    
-            ]),
-/*
-            Layout::table('services' , [
-                TD::make('name'),
-                //TD::make('weight', 'Test')
+            Layout::columns([
+                Layout::rows([
+                    Label::make('status')
+                        ->title('Status')
+                        ->horizontal(),
+                    Label::make('client.name')
+                        ->title('Klijent')
+                        ->horizontal(),
+                    Label::make('worker.name')
+                        ->title('Serviser')
+                        ->horizontal(),
+                    Label::make('driver.name')
+                        ->title('Vozač')
+                        ->horizontal(),
+                    Label::make('order.created_at')
+                        ->title('Datum kreiranja')
+                        ->horizontal(),
+                    Label::make('order.updated_at')
+                        ->title('Datum poslednje promene')
+                        ->horizontal(),
+                    Label::make('order.price')
+                        ->title('Cena')
+                        ->horizontal(),
+                    Label::make('takeout_data')
+                        ->title('Datum Preuzimanja')
+                        ->horizontal(),
+                    Label::make('delivery_data')
+                        ->title('Datum Isporuke')
+                        ->horizontal(),
+                ]),
+                Layout::table('subservices', [
+                    TD::make('service_id', 'Servis')
+                        ->render(function (SubService $subservice) {
+                            return Label::make()
+                                ->title(Service::where('id', $subservice->service_id)->first()->name);
+                            })
+                    ,
+                    TD::make('subclass_type_id', 'Tezina/Aritkal')
+                        ->render(function (SubService $subservice) {
+                            $service = Service::where('id', $subservice->service_id)->first();
+                            if ($service->type == 0) {
+                                return Label::make()
+                                    ->title(WeightClass::where('id', $subservice->subclass_type_id)->first()->name);
+                            }
+                            else {
+                                return Label::make()
+                                    ->title(ClothesType::where('id', $subservice->subclass_type_id)->first()->name);
+                            }
+                        })
+                            
+                    ,
+                    TD::make('amount', 'Kolicina')
+                    ,
+                ])->title('Spisak svih servisa')
             ])
-            */
         ];
     }
 

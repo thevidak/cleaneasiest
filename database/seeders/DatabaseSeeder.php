@@ -123,7 +123,7 @@ class DatabaseSeeder extends Seeder
                 'municipality' => 'Dorcol', 
                 'zip' => '11000', 
                 'phone' => '0641234567' , 
-                'location' => json_encode(["latitude" => 44.81567284269272, "longitude" => 20.437035670230046]),
+                'location' => json_encode(["latitude" => 44.79602117476604, "longitude" => 20.478572200000002]),
                 'permissions' => NULL
             ],
             [
@@ -147,14 +147,13 @@ class DatabaseSeeder extends Seeder
                 'password' => Hash::make('testtest'), 
                 'role_id' => 5, 
                 'surname' => 'test', 
-                'country' => 'Srbija', 
                 'country' => 'Srbija',
-                'address' => 'Cerska 12', 
+                'address' => 'Bulevar Zorana Djindjica 22', 
                 'city' => 'Beograd', 
-                'municipality' => 'Dorcol', 
-                'zip' => '11000', 
+                'municipality' => 'Novi Beograd', 
+                'zip' => '11070', 
                 'phone' => '0641234567' , 
-                'location' => json_encode(["latitude" => 44.81319114386074, "longitude" => 20.460338821181438]),
+                'location' => json_encode(["latitude" => 44.81328890158943, "longitude" => 20.428234940455322]),
                 'permissions' => NULL
             ]
         ]);

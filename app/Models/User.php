@@ -91,23 +91,50 @@ class User extends Authenticatable implements MustVerifyEmail {
 
     // Attributes
     public function getActiveAddressAttribute () {
+        $active_address = NULL;
         foreach ($this->addresses as $address) {
-            if ($address->active) {
-                return $address;
+            if ($address->active && $address->enabled == 1) {
+                $active_address = $address;
+                break;
+            }
+        }
+
+        if (isset($active_address)) {
+            return $active_address;
+        }
+        else {
+            foreach ($this->addresses as $address) {
+                if ($address->enabled == 1) {
+                    $address->active = 1;
+                    $address->save();
+                    return $address;
+                }
             }
         }
         return NULL;
     }
+
     public function getActiveCardAttribute () {
+        $active_card = NULL;
         foreach ($this->cards as $card) {
-            if ($card->active) {
-                return $card;
+            if ($card->active && $card->enabled == 1) {
+                $active_card = $card;
+                break;
+            }
+        }
+        
+        if (isset($active_card)) {
+            return $active_card;
+        }
+        else {
+            foreach ($this->cards as $card) {
+                if ($card->enabled == 1) {
+                    $card->active = 1;
+                    $card->save();
+                    return $card;
+                }
             }
         }
         return NULL;
     }
-
-
-
-
 }

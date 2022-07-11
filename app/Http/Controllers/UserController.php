@@ -51,7 +51,7 @@ class UserController extends Controller
         ]);
         
         $token = $user->createToken('myapptoken')->plainTextToken;
-        //event(new Registered($user));
+        event(new Registered($user));
 
         return [
             'token' => $token,
@@ -318,6 +318,7 @@ class UserController extends Controller
         }
 
         $client_info = [
+            'status' => 1,
             "id"=> $user->id,
             "name"=> $user->name,
             "surname" => $user->surname,
@@ -336,13 +337,13 @@ class UserController extends Controller
 
         ];
 
-
         return $client_info;
     }
 
     public function logout(Request $request) {
         Auth::user()->tokens()->delete();
         return [
+            'status' => 1,
             'message' => 'Logged out'
         ];
     }
@@ -373,12 +374,13 @@ class UserController extends Controller
         $user->save();
 
         return response()->json([
-            'status' => 'success',
+            'status' => 1,
             'message' => 'Location Updated!'
         ], 200);
     }
 
     public function resetPassword (Request $request) {
+        //if (!isset($request['email'])) return response()->json(['status' => 1, errorMessage: 'E-mail ne postoji u bazi']);
         $request->validate(['email' => 'required']);
 
         $status = Password::sendResetLink(
@@ -403,6 +405,7 @@ class UserController extends Controller
             $token = $user->createToken('myapptoken')->plainTextToken;
             
             return [
+                'status' => 1,
                 'token' => $token,
                 'user' => $user
             ];
@@ -438,6 +441,7 @@ class UserController extends Controller
                     'user_id' => $existingUser->id
                 ]);
                 return [
+                    'status' => 1,
                     'token' => $existingUser->createToken('myapptoken')->plainTextToken,
                     'user' => $existingUser
                 ];
@@ -468,8 +472,9 @@ class UserController extends Controller
     // ADDRESSESS
     /*************************************************************************************************************************************/
     public function clientGetAddressList() {
-        $addresses = Auth::user()->addresses;
-        if (count($addresses)==0) return response()->json(['status' => 0,'message' => 'Nema adresa']);
+        //$addresses = Auth::user()->addresses;
+        $addresses = Address::where('user_id', Auth::id())->where('enabled', 1)->get();
+        if (count($addresses)==0) return response()->json(['status' => 1,'addresses' => []]);
 
         return response()->json([
             'status' => 1,
@@ -479,6 +484,7 @@ class UserController extends Controller
 
     public function clientGetActiveAddress() {
         $active_address = Auth::user()->activeAddress;
+
         if (!isset($active_address)) return response()->json(['status' => 0,'message' => 'Nema aktivne adrese']);
 
         return response()->json([
@@ -583,7 +589,7 @@ class UserController extends Controller
 
         $user = Auth::user();
 
-        $current_address = Address::where('id', $request['address_id'])->where('user_id', $user->id)->first();
+        $current_address = Address::where('id', $request['address_id'])->where('user_id', $user->id)->where('enabled', 1)->first();
         if (!isset($current_address)) return response()->json(['status' => 0,'message' => 'Los ID']); 
 
         if($current_address->active == TRUE) {
@@ -593,7 +599,9 @@ class UserController extends Controller
             
         }
 
-        $current_address->delete();
+        //$current_address->delete();
+        $current_address->enabled = 0;
+        $current_address->save();
         return response()->json(['status' => 1]);
     }
 
@@ -601,8 +609,9 @@ class UserController extends Controller
     // CARDS
     /*************************************************************************************************************************************/
     public function clientGetCardList() {
-        $cards = Auth::user()->cards;
-        if (count($cards)==0) return response()->json(['status' => 0,'message' => 'Nema kartica']);
+        //$cards = Auth::user()->cards;
+        $cards = CreditCard::where('user_id',Auth::id())->where('enabled', 1)->get();
+        if (count($cards)==0) return response()->json(['status' => 1,'cards' => []]);
 
         return response()->json([
             'status' => 1,
@@ -625,6 +634,7 @@ class UserController extends Controller
         $request->validate([
             'card_number' => 'required'
         ]);
+        $date = isset($request['expiration_date']) ? $request['expiration_date'] : '';
 
         if (isset($request['active']) && $request['active'] == TRUE) {
             $active_card = $user->activeCard;
@@ -636,6 +646,7 @@ class UserController extends Controller
             CreditCard::create([
                 'user_id' => Auth::id(),
                 'number' => $request['card_number'],
+                'date' => $date,
                 'active' => TRUE
             ]);
 
@@ -644,7 +655,8 @@ class UserController extends Controller
         else {
             CreditCard::create([
                 'user_id' => Auth::id(),
-                'number' => $request['card_number']
+                'number' => $request['card_number'],
+                'date' => $date,
             ]);
 
             return response()->json(['status' => 1]);
@@ -664,7 +676,7 @@ class UserController extends Controller
 
         $user = Auth::user();
 
-        $current_card = CreditCard::where('id', $request['card_id'])->where('user_id', $user->id)->first();
+        $current_card = CreditCard::where('id', $request['card_id'])->where('user_id', $user->id)->where('enabled', 1)->first();
         if (!isset($current_card)) return response()->json(['status' => 0,'message' => 'Los ID']); 
 
         $active_card = $user->activeCard;
@@ -686,7 +698,7 @@ class UserController extends Controller
 
         $user = Auth::user();
 
-        $current_card = CreditCard::where('id', $request['card_id'])->where('user_id', $user->id)->first();
+        $current_card = CreditCard::where('id', $request['card_id'])->where('user_id', $user->id)->where('enabled', 1)->first();
         if (!isset($current_card)) return response()->json(['status' => 0,'message' => 'Los ID']); 
 
         if($current_card->active == TRUE) {
@@ -696,7 +708,8 @@ class UserController extends Controller
             
         }
 
-        $current_card->delete();
+        $current_card->enabled = 0;
+        $current_card->save();
         return response()->json(['status' => 1]);
     }
 

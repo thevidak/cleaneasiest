@@ -20,6 +20,7 @@ use App\Models\Privacy;
 use App\Models\ClientInfo;
 use App\Models\CreditCard;
 use App\Models\SubService;
+use App\Models\Address;
 
 class ClientOrderController extends Controller{
 
@@ -66,35 +67,103 @@ class ClientOrderController extends Controller{
     }
 
 
+
+
+
+
+
+
     public function clientCreateOrder(Request $request) {
-        $request->validate(['payment_info' => 'required', 'takeout_date' => 'required', 'order_info' => 'required']);
+        //$request->validate(['payment_info' => 'required', 'takeout_date' => 'required', 'order_info' => 'required']);
+        $request->validate(['takeout_date' => 'required']);
 
         $current_order = Order::where('client_id', Auth::id())->where('status', OrderStatus::ORDER_IN_CREATION)->first();
         if (!isset($current_order)) return response()->json(["status" => 0, "errorMessage" => "Korpa je prazna"]);
 
-        // if card payment
-        if ($request->payment_info['type'] == 1) {
-            if (!isset($request->payment_info['card_id'])) return response()->json(["status" => 0, "errorMessage" => "Kartica nije uneta"]);
-            // if card is set we check if user already used this card, if not save it
-            $card_number = $request->payment_info['card_id'];
-            $card = CreditCard::where('user_id', Auth::id())->where('number', $card_number)->first();
-            if (!isset($card)) {
-                CreditCard::create([
-                    'user_id' => Auth::id(),
-                    'number' => $card_number
-                ]);
+        $order_info = $request->order_info;
+        $payment_info =  $request->payment_info;
+
+        //payment
+        if (isset($payment_info)) {
+            // if card payment
+            if ($request->payment_info['type'] == 1) {
+                if (!isset($request->payment_info['card_id'])) return response()->json(["status" => 0, "errorMessage" => "Kartica nije uneta"]);
+                // if card is set we check if user already used this card, if not save it
+                $card_number = $request->payment_info['card_id'];
+                $card = CreditCard::where('user_id', Auth::id())->where('number', $card_number)->first();
+                if (!isset($card)) {
+                    $card = CreditCard::create([
+                        'user_id' => Auth::id(),
+                        'number' => $card_number
+                    ]);
+                }
+                $current_order->card_id = $card->id;
             }
+            $current_order->payment_info = $request->payment_info;
+        }
+        else if (isset($request->card_id)) {
+            $card = CreditCard::where('user_id', Auth::id())->where('id', $request->card_id)->first();
+            if (!isset($card)) return response()->json(["status" => 0, "errorMessage" => "Kartica nije definisana"]);
+
+            $current_order->card_id = $request->card_id;
+            $current_order->payment_info = [
+                'type' => 1,
+                'card_id' => $card->number
+            ];
+        }
+        else {
+            $current_order->payment_info = [
+                'type' => 0
+            ];
         }
 
-        $order_info = $request->order_info;
-        if (!isset($order_info["address"])) return response()->json(["status" => 0, "errorMessage" => "Adresa je prazna"]);
-        if (!isset($order_info["location"])) return response()->json(["status" => 0, "errorMessage" => "Lokacija je prazna"]);
-        if (!isset($order_info["location"]['latitude'])) return response()->json(["status" => 0, "errorMessage" => "Latituda je prazna"]);
-        if (!isset($order_info["location"]['longitude'])) return response()->json(["status" => 0, "errorMessage" => "Longituda je prazna"]);
+        // address
+        if (isset($order_info)) {
+            if (!isset($order_info["address"])) return response()->json(["status" => 0, "errorMessage" => "Adresa je prazna"]);
+            if (!isset($order_info["location"])) return response()->json(["status" => 0, "errorMessage" => "Lokacija je prazna"]);
+            if (!isset($order_info["location"]['latitude'])) return response()->json(["status" => 0, "errorMessage" => "Latituda je prazna"]);
+            if (!isset($order_info["location"]['longitude'])) return response()->json(["status" => 0, "errorMessage" => "Longituda je prazna"]);
+            $current_order->order_info = $order_info;
 
+            $address_text = $order_info['address'];
+            $address = Address::where('user_id', Auth::id())->where('text', $address_text)->first();
+            if (!isset($address)) {
+                $address = Address::create([
+                    'user_id' => Auth::id(),
+                    'text' => $order_info["address"],
+                    'note' => isset($order_info["note"]) ? $order_info["note"] : NULL,
+                    'latitude' => $order_info["location"]['latitude'],
+                    'longitude' => $order_info["location"]['longitude']
+                ]);
+            }
+            $current_order->address_id = $address->id;
+        }
+        else if (isset($request->address_id)) {
+            $address = Address::where('user_id', Auth::id())->where('id', $request->address_id)->first();
+            if (!isset($address)) return response()->json(["status" => 0, "errorMessage" => "Adresa nije definisana"]);
+
+            $current_order->address_id = $request->address_id;
+
+            $current_order->order_info = [
+                "address" => $address->text,
+                "note" => $address->note,
+                'location' => [
+                    'latitude' => $address->latitude,
+                    'longitude' => $address->longitude
+                ]
+            ];
+        }
+        else {
+            return response()->json(["status" => 0, "errorMessage" => "Adresa nije definisana"]);
+        }
+        // phone
+        if (isset($request->phone)) {
+            $current_order->phone = $request->phone;
+        }
+
+        // takeout date
         $current_order->takeout_date = $request->takeout_date;
-        $current_order->payment_info = $request->payment_info;
-        $current_order->order_info = $order_info;
+
         $current_order->status = OrderStatus::ORDER_CREATED;
         $current_order->save();
         return response()->json([
@@ -168,19 +237,20 @@ class ClientOrderController extends Controller{
                 array_push($tmp, [
                     "service_id" => $request->service_id,
                     "clothes" => $request->clothes
-                ]
-            );
+                ]);
                 $current_order->services = $tmp;
                 $current_order->save();
                 
                 // new subservices 
                 foreach ($request->clothes as $single_clothes) {
-                    SubService::create([
-                        "order_id" => $current_order->id,
-                        "service_id" => $request->service_id,
-                        "subclass_type_id" => $single_clothes["clothes_type_id"],
-                        "amount" => $single_clothes["count"]
-                    ]);
+                    if ($single_clothes["count"] > 0) {
+                        SubService::create([
+                            "order_id" => $current_order->id,
+                            "service_id" => $request->service_id,
+                            "subclass_type_id" => $single_clothes["clothes_type_id"],
+                            "amount" => $single_clothes["count"]
+                        ]);
+                    }
                 }
                 $current_order->calculatePrice();
                 return response()->json([
@@ -200,12 +270,14 @@ class ClientOrderController extends Controller{
                 
                 // new subservices 
                 foreach ($request->clothes as $single_clothes) {
-                    SubService::create([
-                        "order_id" => $order->id,
-                        "service_id" => $request->service_id,
-                        "subclass_type_id" => $single_clothes["clothes_type_id"],
-                        "amount" => $single_clothes["count"]
-                    ]);
+                    if ($single_clothes["count"] > 0) {
+                        SubService::create([
+                            "order_id" => $order->id,
+                            "service_id" => $request->service_id,
+                            "subclass_type_id" => $single_clothes["clothes_type_id"],
+                            "amount" => $single_clothes["count"]
+                        ]);
+                    }
                 }
                 $order->calculatePrice();
                 return response()->json([
@@ -217,7 +289,7 @@ class ClientOrderController extends Controller{
         }
 
        
-        return response()->json(["status" => 0,"errorMessage" => "Error"]);
+        return response()->json(["status" => 0,"errorMessage" => "Greska!"]);
     }
 
     public function clientDeleteService(Request $request) {
@@ -226,7 +298,7 @@ class ClientOrderController extends Controller{
         $current_order = Order::where('client_id', Auth::id())->where('status', OrderStatus::ORDER_IN_CREATION)->first();
         $service_to_remove = Service::where('id',$request->serviceId)->first();
 
-        if (!isset($service_to_remove)) return response()->json(["status" => 0,"errorMessage" => "Unavailable service name"]);
+        if (!isset($service_to_remove)) return response()->json(["status" => 0,"errorMessage" => "Pogresan ID servisa"]);
 
         if (isset($current_order)) {
             $all_services = $current_order->services;
@@ -259,20 +331,28 @@ class ClientOrderController extends Controller{
             ]);
         }
 
-        return response()->json(["status" => 0,"errorMessage" => "Error"]);
+        return response()->json(["status" => 0,"errorMessage" => "Greska"]);
     }
 
 
     public function clientDeleteSubservice(Request $request) {
-        $request->validate(['subservice_id' => 'required']);
+        $request->validate(['service_id' => 'required', 'class_id' => 'required']);
 
         $current_order = Order::where('client_id', Auth::id())->where('status', OrderStatus::ORDER_IN_CREATION)->first();
         if (!isset($current_order)) return response()->json(["status" => 0,"errorMessage" => "Korpa je prazna"]);
 
-        $subservice = SubService::where('id',$request->subservice_id)->where('order_id', $current_order->id)->first();
-        if (!isset($subservice)) return response()->json(["status" => 0,"errorMessage" => "Servis sa datim ID-em nedostupan"]); 
+        $subservices = SubService::where('service_id',$request->service_id)
+            ->where('order_id', $current_order->id)
+            ->where('subclass_type_id', $request->class_id)->get();
 
-        $subservice->delete();
+        foreach ($subservices as $subservice) {
+            $subservice->delete();
+        }
+
+        $any_subservice = SubService::where('order_id',$current_order->id)->first();
+        if (!isset($any_subservice)) {
+            $current_order->delete();
+        }
 
         return response()->json([
             "status" => 1
@@ -280,7 +360,7 @@ class ClientOrderController extends Controller{
         
 
 
-        return response()->json(["status" => 0,"errorMessage" => "Error"]);
+        return response()->json(["status" => 0,"errorMessage" => "Greska"]);
     }
 
     public function clientGetTotalNuberOfOrders () {
@@ -333,7 +413,7 @@ class ClientOrderController extends Controller{
         $request->validate(['jbp' => 'required']);
 
         $order = Order::where('id',$request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Order invalid"]);
+        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => "Pogresna Narudzbina"]);
 
         $worker = User::where('id',$order->worker_id)->first();
 
@@ -432,7 +512,7 @@ class ClientOrderController extends Controller{
             default :
                 return response()->json([
                     "status" => 0,
-                    'errorMessage' => 'Unavailable status'
+                    'errorMessage' => 'POgresan status narudzbine'
                 ]);
             break;
         }
@@ -442,14 +522,15 @@ class ClientOrderController extends Controller{
         $request->validate(['jbp' => 'required']);
 
         $order = Order::where('id', $request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Unavailable order']);
+        if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Nedostupna narudzbina']);
 
         $result = $order->subserviceGroupedList;
         return response()->json([
             'status' => 1,
             "services" => $result['services'],
             "totalPrice" => $result['fullPrice'],
-            'subservices' => $order->subserviceList
+            'subservices' => $order->subserviceList,
+            'takeout_date' => $order->takeout_date
         ]);
     }
 
@@ -470,12 +551,17 @@ class ClientOrderController extends Controller{
     public function clientGetCurrentPaymentInfo (Request $request) {
         $order = Order::where('client_id', Auth::id())->where('status', OrderStatus::ORDER_IN_CREATION)->first();
 
-        if (!isset($order)) return response()->json(["status" => 0,"errorMessage" => 'No pending orders']);
+        if (!isset($order)) return response()->json([
+            'status' => 1,
+            "services" => [],
+            "totalPrice" => 0,
+            "subservices" =>[]
+        ]);
 
         $result = $order->subserviceGroupedList;
         
         return response()->json([
-            //'status' => 1,
+            'status' => 1,
             "services" => $result['services'],
             "totalPrice" => $result['fullPrice'],
             "subservices" =>$order->subserviceList
@@ -485,7 +571,7 @@ class ClientOrderController extends Controller{
     public function clientGetTotalCartPrice (Request $request) {
         $order = Order::where('client_id', Auth::id())->where('status', OrderStatus::ORDER_IN_CREATION)->first();
 
-        if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Unavailable order']);
+        if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Nedostupna narudzbina']);
 
         $result = $order->subserviceGroupedList;
         
@@ -499,7 +585,7 @@ class ClientOrderController extends Controller{
         $request->validate(['jbp' => 'required']);
 
         $order = Order::where('id', $request->jbp)->first();
-        if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Unavailable order']);
+        if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Nedostupna narudzbina']);
 
         $result = [];
 
@@ -527,10 +613,10 @@ class ClientOrderController extends Controller{
         $request->validate(['jbp' => 'required', 'ratings' => 'required']);
 
         $order = Order::where('id', $request->jbp)->where('status',OrderStatus::ORDER_DELIVERED)->first();
-        if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Unavailable order']);
+        if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Nedostupna narudzbina']);
 
         $rating = OrderRating::where('order_id',$request->jbp)->first();
-        if (isset($rating)) return response()->json(["status" => 0, 'errorMessage' => 'Already rated']);
+        if (isset($rating)) return response()->json(["status" => 0, 'errorMessage' => 'Vec ocenjeno']);
 
         if (isset($request->note)) {
             OrderRating::create([
@@ -561,9 +647,9 @@ class ClientOrderController extends Controller{
         $worker = User::where('id',$order->worker_id)->first();
         $driver = User::where('id',$order->driver_id)->first();
 
-        if (!isset($order)) return response()->json(['status' => 0, 'errorMessage' => 'Unavailable order']);
-        if (!isset($driver)) return response()->json(['status' => 0, 'errorMessage' => 'Unavailable driver']);
-        if (!isset($worker)) return response()->json(['status' => 0, 'errorMessage' => 'Unavailable worker']);
+        if (!isset($order)) return response()->json(['status' => 0, 'errorMessage' => 'Nedostupna narudzbina']);
+        if (!isset($driver)) return response()->json(['status' => 0, 'errorMessage' => 'Nedostupna narudzbina']);
+        if (!isset($worker)) return response()->json(['status' => 0, 'errorMessage' => 'Nedostupna narudzbina']);
 
         $remaining_time = NULL;
         $fractal_distance = 0.5;
@@ -608,7 +694,7 @@ class ClientOrderController extends Controller{
     public function clientEmptyCart () {
         $order = Order::where('client_id', Auth::id())->where('status',OrderStatus::ORDER_IN_CREATION)->first();
 
-        if (!isset($order)) return response()->json(['status' => 0, 'errorMessage' => 'Cart already empty']);
+        if (!isset($order)) return response()->json(['status' => 1]);
 
         # delete subservices
         foreach ($order->subservices as $subservice) {
@@ -659,6 +745,23 @@ class ClientOrderController extends Controller{
         return response()->json([
             "status" => 1,
             "orders" => $orders
+        ]);
+    }
+
+
+    public function clientGetOrderMap(Request $request) {
+        $request->validate(['jbp' => 'required']);
+
+        $order = Order::where('id',$request->jbp)->first();
+        if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Nedostupna Narudzbina']);
+
+        $driver = User::where('id',$order->driver_id)->first();
+        if (!isset($driver)) return response()->json(["status" => 0, 'errorMessage' => 'Nedostupna Narudzbina']);
+
+        return response()->json([
+            'status' => 1,
+            "driverLatitude" => $driver->location["latitude"],
+            "driverLongitude" => $driver->location["longitude"]
         ]);
     }
 

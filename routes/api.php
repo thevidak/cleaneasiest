@@ -114,7 +114,7 @@ Route::group(['middleware'=>['auth:sanctum']], function (){
         Route::post('/orders/order-data', [ClientOrderController::class, 'clientOrderData']);
         
         // missing?
-        //Route::post('/orders/order-map', [ClientOrderController::class, 'clientGetOrderMap']);
+        Route::post('/orders/order-map', [ClientOrderController::class, 'clientGetOrderMap']);
 
         Route::post('/orders/payment-price', [ClientOrderController::class, 'clientGetPaymentInfo']);
         Route::get('/orders/order-default-data', [ClientOrderController::class, 'clientGetExtraData']);

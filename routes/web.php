@@ -10,31 +10,31 @@ use Illuminate\Support\Str;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Auth\Events\Verified;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| contains the "web" middleware group. Now create something great!
-|
-*/
+
 
 Route::get('/', function () {return view('welcome');})->name('home');
+
 Route::get('/reset-password/success', function () { return view('auth.password-reseted'); })->name('password.reset.success');
+
+
 
 Route::get('/email/verify', function () {
     return view('auth.verify-email');
 })->middleware('auth')->name('verification.notice');
 
-Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
-    //$request->fulfill();
-    redirect()->route('home');
+
+Route::get('/email/verify/{id}/{hash}', function (Request $request) {
+    $user = User::find($request->route('id'));
+    if (!hash_equals((string) $request->route('hash'), sha1($user->getEmailForVerification()))) {
+        throw new AuthorizationException;
+    }
+    if ($user->markEmailAsVerified())
+        event(new Verified($user));
+    return redirect('/')->with('verified', true);
 })->name('verification.verify');
 
-//})->middleware(['auth', 'signed'])->name('verification.verify');
 
 Route::post('/email/verification-notification', function (Request $request) {
     $request->user()->sendEmailVerificationNotification();
