@@ -28,7 +28,7 @@ body,
   padding: 0px
 }
 </style>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBOmnOIO9aAka9eS5Ve_D65WRqpuWwRcTw"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ env('GOOGLE_API_KEY','') }}"></script>
 <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
 <script>
     /*
