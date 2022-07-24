@@ -60,13 +60,15 @@ class UserController extends Controller
     }
 
     public function register(Request $request) {
-        $request->validate([
-            'name' => 'required',
-            'surname' => 'required',
-            'phone' => 'required',
-            'email' => 'required',
-            'password' => 'required'
-        ]);
+        if (!isset($request->name) 
+            || !isset($request->surname)
+            || !isset($request->phone)
+            || !isset($request->email)
+            || !isset($request->password)
+            ) return response()->json([
+                'status' => 0, 
+                'errorMessage' => 'Nedostaje obavezno polje',
+            ]);
 
         $user = User::where('email',$request->email)-> first();
         
@@ -86,6 +88,7 @@ class UserController extends Controller
 
         return response()->json([
             'status' => 1,
+            'userId'=> $createdUserData['user']->id,
             'token' => $createdUserData['token']
         ]);
     }
@@ -302,6 +305,7 @@ class UserController extends Controller
         }
         return response()->json([
             'status' => 1,
+            'userId' => $user->id,
             'type' => $user_type, 
             'token' => $token
         ]);
@@ -406,6 +410,7 @@ class UserController extends Controller
             
             return [
                 'status' => 1,
+                'userId' => $user->id,
                 'token' => $token,
                 'user' => $user
             ];

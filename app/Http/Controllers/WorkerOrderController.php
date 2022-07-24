@@ -344,12 +344,33 @@ class WorkerOrderController extends Controller{
                 $order->worker_id = Auth::id();
                 $order->delivery_date = $delivery_date;
                 $order->save();
+
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Porudzbina prihvacena!",
+                        [(string)$order->client_id],
+                        NULL,
+                        array('jbp' => $order->id, 'type' => 'ORDER_ACCEPTED')
+                    );
+                }
+                catch (\Throwable $e) {} 
+                /*
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Nova Narudzbina!",
+                        ['3'],
+                        NULL,
+                        array('jbp' => $current_order->id)
+                    );
+                }
+                catch (\Throwable $e) {}
+                */
                 return response()->json([
                     "status" => 1
                 ]);
             }
             else {
-                return response()->json(["status" => 0, "errorMessage" => "Order Not Accepted"]);
+                return response()->json(["status" => 0, "errorMessage" => "Porudzbina je vec prihvacena"]);
             }
         }
     }
@@ -437,6 +458,16 @@ class WorkerOrderController extends Controller{
             if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER) {
                 $order->status = OrderStatus::WORKER_PROCESSING;
                 $order->save();
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Porudzbina dostavljena serviseru!",
+                        [(string)$order->client_id],
+                        NULL,
+                        array('jbp' => $order->id)
+                    );
+                }
+                catch (\Throwable $e) {}
+
                 return response()->json([
                     "status" => 1
                 ]);
@@ -456,6 +487,17 @@ class WorkerOrderController extends Controller{
             if ($order->status == OrderStatus::WORKER_FINISHED) {
                 $order->status = OrderStatus::DRIVER_TAKEOUT_FROM_WORKER;
                 $order->save();
+
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Vozac preuzima porudzbinu od servisera!",
+                        [(string)$order->client_id],
+                        NULL,
+                        array('jbp' => $order->id)
+                    );
+                }
+                catch (\Throwable $e) {}  
+
                 return response()->json([
                     "status" => 1
                 ]);
@@ -476,6 +518,27 @@ class WorkerOrderController extends Controller{
 
         if ($order->status == OrderStatus::WORKER_PROCESSING) {
             $order->status = OrderStatus::WORKER_FINISHED;
+
+            try {
+                \OneSignal::sendNotificationToExternalUser(
+                    "Serviser zavrsio!",
+                    [(string)$order->client_id],
+                    NULL,
+                    array('jbp' => $order->id)
+                );
+            }
+            catch (\Throwable $e) {}  
+
+            try {
+                \OneSignal::sendNotificationToExternalUser(
+                    "Nova Narudzbina!",
+                    ['3'],
+                    NULL,
+                    array('jbp' => $current_order->id)
+                );
+            }
+            catch (\Throwable $e) {}
+
             $order->save();
             return response()->json([
                 "status" => 1
@@ -710,8 +773,20 @@ class WorkerOrderController extends Controller{
                 // order loaded from driver
                 if ($request->status == TRUE) {
                     if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER) {
+                        
                         $order->status = OrderStatus::WORKER_PROCESSING;
                         $order->save();
+
+                        try {
+                            \OneSignal::sendNotificationToExternalUser(
+                                "Dostavljeno serviseru!",
+                                [(string)$order->client_id],
+                                NULL,
+                                array('jbp' => $order->id)
+                            );
+                        }
+                        catch (\Throwable $e) {}  
+
                         return response()->json(["status" => 1]);
                     }
                 }
@@ -724,7 +799,29 @@ class WorkerOrderController extends Controller{
                 if ($request->status == TRUE) {
                     if ($order->status == OrderStatus::WORKER_PROCESSING) {
                         $order->status = OrderStatus::WORKER_FINISHED;
+                        
                         $order->save();
+
+                        try {
+                            \OneSignal::sendNotificationToExternalUser(
+                                "Serviser zavrsio!",
+                                [(string)$order->client_id],
+                                NULL,
+                                array('jbp' => $order->id)
+                            );
+                        }
+                        catch (\Throwable $e) {}  
+
+                        try {
+                            \OneSignal::sendNotificationToExternalUser(
+                                "Nova Narudzbina!",
+                                ['3'],
+                                NULL,
+                                array('jbp' => $current_order->id)
+                            );
+                        }
+                        catch (\Throwable $e) {}
+
                         return response()->json(["status" => 1]);
                     }
                 }
@@ -738,6 +835,17 @@ class WorkerOrderController extends Controller{
                     if ($order->status == OrderStatus::WORKER_FINISHED) {
                         $order->status = OrderStatus::DRIVER_TAKEOUT_FROM_WORKER;
                         $order->save();
+
+                        try {
+                            \OneSignal::sendNotificationToExternalUser(
+                                "Vozac preuzima od servisera!",
+                                [(string)$order->client_id],
+                                NULL,
+                                array('jbp' => $order->id)
+                            );
+                        }
+                        catch (\Throwable $e) {}  
+
                         return response()->json(["status" => 1]);
                     }
                 }
@@ -795,6 +903,25 @@ class WorkerOrderController extends Controller{
         }
 
         return $pending_orders;
+    }
+
+    public function workerGetOrderHistory () {
+        $completed_orders = Order::where('worker_id', Auth::id())->where('status', OrderStatus::ORDER_DELIVERED)->get();
+        $orders = [];
+
+        foreach ($completed_orders as $completed_order) {
+            if ($completed_order->status == OrderStatus::ORDER_DELIVERED) {
+                $orders[] = [
+                    "id" => $completed_order->id,
+                    "status" => "Realizovano"
+                ];
+            }
+        }
+
+        return response()->json([
+            "status" => 1,
+            "orders" => $orders
+        ]);
     }
 
     /*

@@ -17,6 +17,23 @@ use App\Models\User;
 use App\Mail\NewUserNotification;
 
 Route::get('test', function()  {
+    
+    \OneSignal::sendNotificationToExternalUser(
+        "Cao User 4",
+        ['4'],
+        NULL,
+        array('test' => '123'),
+        NULL,
+        NULL
+    );
+
+
+    return response()->json([
+        'status' => 1
+    ]);
+
+
+    
     //\Mail::to('thevidak@yahoo.com')->send(new \App\Mail\NewUserNotification);
 });
 Route::post('test', [UserController::class, 'test']);
@@ -55,19 +72,9 @@ Route::group(['middleware'=>['auth:sanctum']], function (){
         Route::post('/orders/accepted-order-info', [WorkerOrderController::class, 'workerGetOrderData']);
         Route::post('/orders/accepted-order-status', [WorkerOrderController::class, 'workerGetOrderStatus']);
         Route::get('/reject-reasons', [WorkerOrderController::class, 'workerRejectReasons']);
-
-        # old
-        //Route::post('/orders/accepted-order-load-data', [OrderController::class, 'workerLoadAcceptedOrderData']);
-        //Route::post('/orders/accepted-order-delivery-data', [OrderController::class, 'workerLoadAcceptedOrderData']);
-        # new
         Route::post('/orders/order-data', [WorkerOrderController::class, 'workerOrderData']);
-
-        # old
-        //Route::post('/orders/accepted-order-set-loaded', [OrderController::class, 'workerSetLoadedAcceptedOrder']);
-        //Route::post('/orders/accepted-order-set-delivered', [OrderController::class, 'workerSetDeliveredAcceptedOrder']);
-        //Route::post('/orders/accepted-order-set-ready', [OrderController::class, 'workerSetReadydAcceptedOrder']);
-        # new 
         Route::post('/orders/change-status', [WorkerOrderController::class, 'workerChangeOrderStatus']);
+        Route::get('/orders/history', [WorkerOrderController::class, 'workerGetOrderHistory']);
     });
     // requires Driver role
     Route::group(['prefix' => 'driver','middleware'=>['is.driver']], function (){
@@ -81,6 +88,7 @@ Route::group(['middleware'=>['auth:sanctum']], function (){
         Route::get('/cant-load-from-client-reasons', [DriverOrderController::class, 'driverGetUnableToLoadFromClientReasons']);
         Route::post('/orders/order-data', [DriverOrderController::class, 'driverOrderData']);
         Route::post('/orders/change-status', [DriverOrderController::class, 'driverChangeOrderStatus']);
+        Route::get('/orders/history', [DriverOrderController::class, 'driverGetOrderHistory']);
     });
     // requires Client role
     Route::group(['prefix' => 'client','middleware'=>['is.client']], function (){
@@ -112,6 +120,7 @@ Route::group(['middleware'=>['auth:sanctum']], function (){
         Route::get('/orders/list', [ClientOrderController::class, 'clientGetOrderList']);
         Route::post('/orders/order-status', [ClientOrderController::class, 'clientGetOrderStatus']);
         Route::post('/orders/order-data', [ClientOrderController::class, 'clientOrderData']);
+        Route::post('/orders/update-order-data', [ClientOrderController::class, 'clientUpdateOrderData']);
         
         // missing?
         Route::post('/orders/order-map', [ClientOrderController::class, 'clientGetOrderMap']);

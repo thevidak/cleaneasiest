@@ -166,6 +166,17 @@ class ClientOrderController extends Controller{
 
         $current_order->status = OrderStatus::ORDER_CREATED;
         $current_order->save();
+
+        try {
+            \OneSignal::sendNotificationToExternalUser(
+                "Nova Narudzbina!",
+                ['2'],
+                NULL,
+                array('jbp' => $current_order->id)
+            );
+        }
+        catch (\Throwable $e) {}
+
         return response()->json([
             "status" => 1
         ]);
@@ -689,6 +700,33 @@ class ClientOrderController extends Controller{
             "clientLongitude" => $order->order_info['location']['longitude'],
 
         ]);
+    }
+
+    public function clientUpdateOrderData(Request $request) {
+        $request->validate(['jbp' => 'required']);
+        
+        $order = Order::where('id',$request->jbp)->first();
+        if (!isset($order)) return response()->json(["status" => 0, 'errorMessage' => 'Pogresna porudzbina']);
+        if ($order->client_id != Auth::id()) return response()->json(["status" => 0, 'errorMessage' => 'Pogresna porudzbina']);
+
+        if (isset($request->takeout_date)) {
+            if (in_array($order->status, [
+                OrderStatus::ORDER_IN_CREATION,
+                OrderStatus::ORDER_CREATED,
+                OrderStatus::WORKER_ACCEPTED,
+                OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT
+            ])) {
+                $order->takeout_date = $request->takeout_date;
+                $order->save();
+            }
+
+            else {
+                return response()->json(["status" => 0, 'errorMessage' => 'Nemoguce promeniti datum']);
+            }
+            
+        }
+
+        return response()->json(['status' => 1]);
     }
 
     public function clientEmptyCart () {

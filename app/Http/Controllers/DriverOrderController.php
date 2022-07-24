@@ -309,6 +309,17 @@ class DriverOrderController extends Controller{
                 $order->status = OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT;
                 $order->driver_id = Auth::id();
                 $order->save();
+
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Vozac je prihvatio!",
+                        [(string)$order->client_id],
+                        NULL,
+                        array('jbp' => $order->id)
+                    );
+                }
+                catch (\Throwable $e) {}
+
                 return response()->json([
                     "status" => 1
                 ]);
@@ -317,6 +328,17 @@ class DriverOrderController extends Controller{
                 $order->status = OrderStatus::DRIVER_TAKEOUT_FROM_WORKER;
                 $order->driver_id = Auth::id();
                 $order->save();
+
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Vozac je prihvatio!",
+                        [(string)$order->client_id],
+                        NULL,
+                        array('jbp' => $order->id)
+                    );
+                }
+                catch (\Throwable $e) {}
+
                 return response()->json([
                     "status" => 1
                 ]);
@@ -324,7 +346,7 @@ class DriverOrderController extends Controller{
             else {
                 return response()->json([
                     "status" => 0,
-                    "errorMessage" => "Greska"
+                    "errorMessage" => "Porudzbina je vec prihvacena"
                 ]);
             }
         }
@@ -406,6 +428,17 @@ class DriverOrderController extends Controller{
             if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT || $order->status == OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT) {
                 $order->status = OrderStatus::DRIVER_DELIVERY_TO_WORKER;
                 $order->save();
+
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Vozac preuzeo!",
+                        [(string)$order->client_id],
+                        NULL,
+                        array('jbp' => $order->id)
+                    );
+                }
+                catch (\Throwable $e) {}
+
                 return response()->json([
                     "status" => 1
                 ]);
@@ -415,6 +448,16 @@ class DriverOrderController extends Controller{
             if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT) {
                 $order->status = OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT;
                 $order->save();
+
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Neuspelo preuzimanje!",
+                        [(string)$order->client_id],
+                        NULL,
+                        array('jbp' => $order->id)
+                    );
+                }
+                catch (\Throwable $e) {}
                 
                 return response()->json([
                     "status" => 1
@@ -440,6 +483,17 @@ class DriverOrderController extends Controller{
             if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER || $order->status == OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER) {
                 $order->status = OrderStatus::WORKER_PROCESSING;
                 $order->save();
+
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Dostavlejno serviseru!",
+                        [(string)$order->client_id],
+                        NULL,
+                        array('jbp' => $order->id)
+                    );
+                }
+                catch (\Throwable $e) {}
+                
                 return response()->json([
                     "status" => 1
                 ]);
@@ -455,6 +509,17 @@ class DriverOrderController extends Controller{
             if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER) {
                 $order->status = OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER;
                 $order->save();
+
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Neuspela dostaqva serviseru!",
+                        [(string)$order->client_id],
+                        NULL,
+                        array('jbp' => $order->id)
+                    );
+                }
+                catch (\Throwable $e) {}
+
                 return response()->json([
                     "status" => 1
                 ]);
@@ -474,6 +539,17 @@ class DriverOrderController extends Controller{
             if ($order->status == OrderStatus::WORKER_FINISHED || $order->status == OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER) {
                 $order->status = OrderStatus::DRIVER_DELIVERY_TO_CLIENT;
                 $order->save();
+
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Vozac preuzeo!",
+                        [(string)$order->client_id],
+                        NULL,
+                        array('jbp' => $order->id)
+                    );
+                }
+                catch (\Throwable $e) {}
+
                 return response()->json([
                     "status" => 1
                 ]);
@@ -484,6 +560,17 @@ class DriverOrderController extends Controller{
             if ($order->status == OrderStatus::WORKER_FINISHED) {
                 $order->status = OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER;
                 $order->save();
+
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Neuspelo preuzimanje!",
+                        [(string)$order->client_id],
+                        NULL,
+                        array('jbp' => $order->id)
+                    );
+                }
+                catch (\Throwable $e) {}
+
                 return response()->json([
                     "status" => 1
                 ]);
@@ -503,6 +590,17 @@ class DriverOrderController extends Controller{
             if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_CLIENT || $order->status == OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT) {
                 $order->status = OrderStatus::ORDER_DELIVERED;
                 $order->save();
+
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Porudzbina dostavljena!",
+                        [(string)$order->client_id],
+                        NULL,
+                        array('jbp' => $order->id)
+                    );
+                }
+                catch (\Throwable $e) {}
+
                 return response()->json([
                     "status" => 1
                 ]);
@@ -513,6 +611,17 @@ class DriverOrderController extends Controller{
             if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_CLIENT) {
                 $order->status = OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT;
                 $order->save();
+
+                try {
+                    \OneSignal::sendNotificationToExternalUser(
+                        "Neuspela dostava!",
+                        [(string)$order->client_id],
+                        NULL,
+                        array('jbp' => $order->id)
+                    );
+                }
+                catch (\Throwable $e) {}
+
                 return response()->json([
                     "status" => 1
                 ]);
@@ -698,6 +807,17 @@ class DriverOrderController extends Controller{
                     if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT || $order->status == OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT) {
                         $order->status = OrderStatus::DRIVER_DELIVERY_TO_WORKER;
                         $order->save();
+
+                        try {
+                            \OneSignal::sendNotificationToExternalUser(
+                                "Porudzbina Preuzeta!",
+                                [(string)$order->client_id],
+                                NULL,
+                                array('jbp' => $order->id)
+                            );
+                        }
+                        catch (\Throwable $e) {}
+
                         return response()->json(["status" => 1]);
                     }
                 }
@@ -705,6 +825,17 @@ class DriverOrderController extends Controller{
                     if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_CLIENT) {
                         $order->status = OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_CLIENT;
                         $order->save();
+
+                        try {
+                            \OneSignal::sendNotificationToExternalUser(
+                                "Neuspelo preuzimanje!",
+                                [(string)$order->client_id],
+                                NULL,
+                                array('jbp' => $order->id)
+                            );
+                        }
+                        catch (\Throwable $e) {}
+
                         return response()->json(["status" => 1]);
                     }
                     return response()->json(["status" => 0, "errorMessage" => "Order status invalid"]);
@@ -715,6 +846,17 @@ class DriverOrderController extends Controller{
                     if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER || $order->status == OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER) {
                         $order->status = OrderStatus::WORKER_PROCESSING;
                         $order->save();
+
+                        try {
+                            \OneSignal::sendNotificationToExternalUser(
+                                "Porudzbina dostavljena serviseru!",
+                                [(string)$order->client_id],
+                                NULL,
+                                array('jbp' => $order->id)
+                            );
+                        }
+                        catch (\Throwable $e) {}
+
                         return response()->json(["status" => 1]);
                     }
                     else if ($order->status == OrderStatus::WORKER_PROCESSING) {
@@ -726,6 +868,17 @@ class DriverOrderController extends Controller{
                     if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_WORKER) {
                         $order->status = OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_WORKER;
                         $order->save();
+
+                        try {
+                            \OneSignal::sendNotificationToExternalUser(
+                                "Neuspela dostava serviseru!",
+                                [(string)$order->client_id],
+                                NULL,
+                                array('jbp' => $order->id)
+                            );
+                        }
+                        catch (\Throwable $e) {}
+
                         return response()->json(["status" => 1]);
                     }
                     return response()->json(["status" => 0, "errorMessage" => "Unable to reject"]);
@@ -736,6 +889,17 @@ class DriverOrderController extends Controller{
                     if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_WORKER || $order->status == OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER) {
                         $order->status = OrderStatus::DRIVER_DELIVERY_TO_CLIENT;
                         $order->save();
+
+                        try {
+                            \OneSignal::sendNotificationToExternalUser(
+                                "Vozac preuzeo!",
+                                [(string)$order->client_id],
+                                NULL,
+                                array('jbp' => $order->id)
+                            );
+                        }
+                        catch (\Throwable $e) {}
+
                         return response()->json(["status" => 1]);
                     }
                     return response()->json(["status" => 0,"errorMessage" => "Cannot accept"]);
@@ -744,6 +908,17 @@ class DriverOrderController extends Controller{
                     if ($order->status == OrderStatus::DRIVER_TAKEOUT_FROM_WORKER) {
                         $order->status = OrderStatus::DRIVER_UNABLE_TO_LOAD_FROM_WORKER;
                         $order->save();
+
+                        try {
+                            \OneSignal::sendNotificationToExternalUser(
+                                "Neuspelo preuzimanje!",
+                                [(string)$order->client_id],
+                                NULL,
+                                array('jbp' => $order->id)
+                            );
+                        }
+                        catch (\Throwable $e) {}
+
                         return response()->json(["status" => 1]);
                     }
                     return response()->json(["status" => 0,"errorMessage" => "Cannot reject"]);
@@ -754,6 +929,17 @@ class DriverOrderController extends Controller{
                     if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_CLIENT || $order->status == OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT) {
                         $order->status = OrderStatus::ORDER_DELIVERED;
                         $order->save();
+
+                        try {
+                            \OneSignal::sendNotificationToExternalUser(
+                                "Dostavljeno!",
+                                [(string)$order->client_id],
+                                NULL,
+                                array('jbp' => $order->id)
+                            );
+                        }
+                        catch (\Throwable $e) {}
+
                         return response()->json(["status" => 1]);
                     }
                     return response()->json(["status" => 0, 'errorMessage' => 'Ubable to accept order, status invalid']);
@@ -762,6 +948,17 @@ class DriverOrderController extends Controller{
                     if ($order->status == OrderStatus::DRIVER_DELIVERY_TO_CLIENT) {
                         $order->status = OrderStatus::DRIVER_UNABLE_TO_DELIVER_TO_CLIENT;
                         $order->save();
+
+                        try {
+                            \OneSignal::sendNotificationToExternalUser(
+                                "Neuspela dostava!",
+                                [(string)$order->client_id],
+                                NULL,
+                                array('jbp' => $order->id)
+                            );
+                        }
+                        catch (\Throwable $e) {}
+
                         return response()->json(["status" => 1]);
                     }
                     return response()->json(["status" => 0, 'errorMessage' => 'Unable to reject order, status invalid']);
@@ -834,6 +1031,26 @@ class DriverOrderController extends Controller{
         return response()->json([
             'status' => 'Success',
             'message' => 'Driver delivered order'
+        ]);
+    }
+
+
+    public function driverGetOrderHistory () {
+        $completed_orders = Order::where('driver_id', Auth::id())->where('status', OrderStatus::ORDER_DELIVERED)->get();
+        $orders = [];
+
+        foreach ($completed_orders as $completed_order) {
+            if ($completed_order->status == OrderStatus::ORDER_DELIVERED) {
+                $orders[] = [
+                    "id" => $completed_order->id,
+                    "status" => "Realizovano"
+                ];
+            }
+        }
+
+        return response()->json([
+            "status" => 1,
+            "orders" => $orders
         ]);
     }
 
